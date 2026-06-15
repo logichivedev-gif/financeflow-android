@@ -1,0 +1,6 @@
+{
+  "name": "FinanceFlow",
+  "description": "Una aplicación nativa offline-first para el control inteligente de ingresos, gastos fijos, variables y perfiles de hogar paso a paso.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
