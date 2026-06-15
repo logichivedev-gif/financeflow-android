@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Premium Diagonal Background Gradient -->
+    <path
+        android:pathData="M0,0h108v108H0z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:type="linear">
+                <item
+                    android:color="#121622"
+                    android:offset="0.0" />
+                <item
+                    android:color="#0A3052"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Tech Grid Subtle Horizontal Lines -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,18 L108,18 M0,36 L108,36 M0,54 L108,54 M0,72 L108,72 M0,90 L108,90"
+        android:strokeWidth="0.4"
+        android:strokeColor="#0BFFFFFF" />
+
+    <!-- Tech Grid Subtle Vertical Lines -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M18,0 L18,108 M36,0 L36,108 M54,0 L54,108 M72,0 L72,108 M90,0 L90,108"
+        android:strokeWidth="0.4"
+        android:strokeColor="#0BFFFFFF" />
+
+    <!-- Tech Circle 1 (Large Concentric Ring) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M 54, 12 A 42,42 0 1,1 53.9,12 Z"
+        android:strokeWidth="1.2"
+        android:strokeColor="#1500D3FF" />
+
+    <!-- Tech Circle 2 (Medium Concentric Ring) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M 54, 26 A 28,28 0 1,1 53.9,26 Z"
+        android:strokeWidth="0.8"
+        android:strokeColor="#1A0061A4" />
+
+    <!-- Subtle diagonal data line -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M 10,98 L 98,10"
+        android:strokeWidth="0.5"
+        android:strokeColor="#0CFFFFFF" />
+
+</vector>

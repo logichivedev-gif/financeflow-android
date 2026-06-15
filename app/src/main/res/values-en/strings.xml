@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">FinanceFlow</string>
+    <string name="menu_profile">Profile &amp; Income</string>
+    <string name="menu_wizard_fixed">Wizard Fixed Expenses</string>
+    <string name="menu_preferences">UI Preferences</string>
+    <string name="menu_about">About FinanceFlow</string>
+    <string name="menu_report_error">Report Errors 🐞</string>
+    <string name="menu_database">Database</string>
+</resources>
