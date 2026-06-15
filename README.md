@@ -1,27 +1,32 @@
 # FinanceFlow 📱
 
-An independent, native Android personal finance application designed under an **offline-first** philosophy and structured around custom salary cycles.
+An independent, native Android personal finance application designed under an **offline-first** philosophy, structured around custom salary cycles, and published by **Syntax Forge DEV**.
 
 ---
 
-## Features
+## Technical Features (v1.1.0)
 
-- **Strict "Black Box" Financial Engine:** Net balance factors in projected daily variable expenses alongside upcoming fixed bills to prevent accidental overspending.
-- **Multi-language Support:** Native adaptability (English/Spanish) using optimized system string resources.
-- **Autonomous Update Notifications:** Built-in update checker that securely queries the GitHub API to notify users of new releases.
-- **Dynamic Currency & UX:** Automatically adapts to the host system's local currency symbol and clears focus/keyboards smoothly upon data entry.
-- **Absolute Privacy:** No cloud sync, no third-party bank linking. All data remains securely stored on your local device via Room Database.
+- **Strict "Black Box" Financial Engine:** Net balance calculation strictly factors in projected daily variable expenses along with upcoming fixed bills to prevent false-positive green indicators:
+  $$Margen\,Libre = Saldo\,Actual - Fijos\,Pendientes - (Gasto\,Diario\,Promedio \times Días\,Restantes)$$
+- **Fluid Keyboard & Focus UX:** Solved input obstruction by integrating `LocalSoftwareKeyboardController` and `LocalFocusManager`. Virtual keyboards hide instantly upon `ImeAction.Done`, clarifying backend Room persistence via immediate Material Design 3 Snackbars.
+- **Autonomous Update Notifications:** Built-in network utility (`UpdateChecker`) that asynchronous-safely (`Dispatchers.IO`) queries the GitHub Releases API to parse assets and notify users via a non-cancellable custom `UpdateDialog`.
+- **Multi-language Support:** Native internationalization (English/Spanish) using decoupled system string resources (`stringResource`).
+- **Dynamic Currency Localization:** Removed hardcoded currency layouts. Employs `Currency.getInstance(Locale.getDefault()).symbol` to seamlessly map locale-specific parameters (e.g., `$`, `€`).
+- **Resource Patching:** Resolved framework initialization crashes by forcing standard `<?xml version="1.0" encoding="utf-8"?>` encoding parameters on custom vector drawables.
+- **Absolute Privacy:** Strict offline architectures. No cloud sync or third-party banking APIs. Data is completely localized via SQLite/Room.
 
 ---
 
 ## Español
 
-Aplicación nativa de finanzas personales basada en ciclos de nómina independientes y diseñada bajo una filosofía **offline-first**.
+Aplicación nativa de finanzas personales basada en ciclos de nómina independientes y desarrollada por **Syntax Forge DEV**.
 
-- **Algoritmo de Extrema Estrictez:** El margen libre real descuenta la proyección de gasto variable restante del ciclo y los recibos fijos inminentes para evitar falsos optimistas.
-- **Privacidad Absoluta:** Sin registros ni sincronización en la nube. Tus datos financieros se almacenan localmente utilizando tecnología Room.
-- **Soporte Multiidioma Nativo:** Adaptabilidad limpia mediante recursos del sistema (ES/EN).
-- **Notificación de Actualizaciones:** Sistema autónomo que comprueba lanzamientos directamente desde la API pública de GitHub.
+- **Algoritmo de Extrema Estrictez ("Peor Escenario"):** El margen libre real descuenta la proyección de gasto variable restante del ciclo y los recibos fijos inminentes para erradicar balances engañosos.
+- **Interacción de Entrada Optimizada (UX):** Control estricto de foco y ocultación del teclado virtual al confirmar datos, asegurando la visibilidad completa del Snackbar de confirmación.
+- **Notificación de Actualizaciones:** Sistema autónomo en segundo plano que comprueba nuevos despliegues de APKs a través de la API de GitHub.
+- **Soporte Multiidioma Nativo:** Adaptabilidad limpia mediante recursos independientes del sistema (ES/EN).
+- **Divisa Flexible:** Detección automática del símbolo monetario del sistema operativo.
+- **Privacidad Total:** Base de datos relacional Room 100% aislada en el dispositivo.
 
 ---
 
