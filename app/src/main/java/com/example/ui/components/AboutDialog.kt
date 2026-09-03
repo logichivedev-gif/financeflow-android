@@ -39,11 +39,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     color = FinanceSlateDark
                 )
                 Text(
-                    text = if (BuildConfig.CHANGES_COUNT > 0) {
-                        "Versión ${BuildConfig.VERSION_NAME} (Progreso: ${BuildConfig.CHANGES_COUNT}/10 cambios)"
-                    } else {
-                        "Versión ${BuildConfig.VERSION_NAME}"
-                    },
+                    text = "Versión ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = FinanceSlateLight
                 )
