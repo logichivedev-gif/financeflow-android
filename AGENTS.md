@@ -6,6 +6,7 @@ A partir de la versión v2.2.0:
 2. **Registro y control**: Se mantiene el contador `CHANGES_COUNT` en `app/version.properties` y se incrementa en +1 con cada cambio/tarea implementada.
 3. **Alerta de Límite (10/10)**: Al alcanzar `CHANGES_COUNT = 10`, Gradle emite una advertencia formal en la consola y se avisa al usuario para cerrar el ciclo y preparar la Release en GitHub.
 4. **Cierre y Reset**: Al publicar la release, se actualiza el número de versión (ej. de 2.2.0 a 2.3.0) y `CHANGES_COUNT` vuelve a 0.
+5. **Notas de la Versión Automáticas**: En cada preparación o cierre de versión, se redactan todas las novedades, mejoras y cambios detallados en el archivo raíz `RELEASE_NOTES.md` para alimentar directamente la publicación automática en GitHub.
 
 ## Backlog / Tareas Pendientes
 
