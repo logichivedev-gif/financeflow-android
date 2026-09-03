@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -5,6 +7,56 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
 }
+
+// -----------------------------------------------------------------------------
+// Auto-increment version logic using version.properties
+// -----------------------------------------------------------------------------
+val versionPropsFile = file("version.properties")
+val versionProps = Properties()
+
+if (versionPropsFile.canRead()) {
+    versionPropsFile.inputStream().use { versionProps.load(it) }
+} else {
+    versionProps.setProperty("VERSION_CODE", "14")
+    versionProps.setProperty("VERSION_MAJOR", "2")
+    versionProps.setProperty("VERSION_MINOR", "2")
+    versionProps.setProperty("VERSION_PATCH", "0")
+    versionProps.setProperty("CHANGES_COUNT", "0")
+    versionPropsFile.outputStream().use { versionProps.store(it, "Version Configuration") }
+}
+
+var currentVersionCode = (versionProps.getProperty("VERSION_CODE") ?: "14").toIntOrNull() ?: 14
+val versionMajor = versionProps.getProperty("VERSION_MAJOR") ?: "2"
+val versionMinor = versionProps.getProperty("VERSION_MINOR") ?: "2"
+val versionPatch = versionProps.getProperty("VERSION_PATCH") ?: "0"
+var changesCount = (versionProps.getProperty("CHANGES_COUNT") ?: "0").toIntOrNull() ?: 0
+
+val isBuildTask = gradle.startParameter.taskNames.any { taskName ->
+    taskName.contains("assemble", ignoreCase = true) ||
+    taskName.contains("bundle", ignoreCase = true) ||
+    taskName.contains("build", ignoreCase = true) ||
+    taskName.contains("compile", ignoreCase = true)
+}
+
+if (isBuildTask) {
+    currentVersionCode += 1
+    versionProps.setProperty("VERSION_CODE", currentVersionCode.toString())
+    versionProps.setProperty("CHANGES_COUNT", changesCount.toString())
+    versionPropsFile.outputStream().use { versionProps.store(it, "Auto-incremented on build") }
+}
+
+if (changesCount >= 10) {
+    logger.warn("""
+    ********************************************************************************
+    ⚠️  ALERTA DE LÍMITE DE VERSIÓN (REGLA DE LOS 10 CAMBIOS):
+    Actualmente hay $changesCount / 10 cambios registrados en version.properties.
+    Es momento de preparar y publicar el Release v$versionMajor.$versionMinor.$versionPatch en GitHub!
+    Recuerda reiniciar CHANGES_COUNT=0 tras publicar la release.
+    ********************************************************************************
+    """.trimIndent())
+}
+
+val computedVersionName = versionProps.getProperty("VERSION_NAME") ?: "$versionMajor.$versionMinor.$versionPatch"
 
 android {
   namespace = "com.example"
@@ -14,8 +66,10 @@ android {
     applicationId = "com.aistudio.financeflow.rfqbxz"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "1.1.0"
+    versionCode = currentVersionCode
+    versionName = computedVersionName
+
+    buildConfigField("int", "CHANGES_COUNT", changesCount.toString())
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -28,6 +82,12 @@ android {
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
+    create("debugConfig") {
+      storeFile = file("${rootDir}/debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
   }
 
   buildTypes {
@@ -38,7 +98,7 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Use default debug signing config
+      signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
   compileOptions {
@@ -73,6 +133,7 @@ dependencies {
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.material3.windowsizeclass)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
@@ -84,6 +145,7 @@ dependencies {
   // implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
+  implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
@@ -93,10 +155,9 @@ dependencies {
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
-  implementation(libs.play.billing)
-  implementation(libs.play.billing.ktx)
   implementation(libs.retrofit)
   implementation(libs.androidx.core.splashscreen)
+  implementation(libs.androidx.biometric)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

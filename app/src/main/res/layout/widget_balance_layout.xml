@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Header info with title and quick-refresh indicators -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/widget_app_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FinanceFlow • Balance"
+            android:textColor="#94A3B8"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_refresh_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:text="Sincronizado"
+            android:textColor="#64748B"
+            android:textSize="10sp" />
+    </RelativeLayout>
+
+    <!-- Large available balance section -->
+    <TextView
+        android:id="@+id/widget_balance_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0.00 €"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textColorHighlight="#2D3748"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Status badge description text -->
+    <LinearLayout
+        android:id="@+id/widget_status_badge_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/widget_status_safe"
+        android:paddingLeft="8dp"
+        android:paddingTop="4dp"
+        android:paddingRight="8dp"
+        android:paddingBottom="4dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✅ Fondo disponible real"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,5 +1,8 @@
 package com.example.ui
 
+import android.content.Context
+import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
@@ -14,6 +17,10 @@ import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+enum class SortOrder {
+    BY_DATE, BY_AMOUNT, BY_TYPE
+}
 
 // Remoción completa de diagnósticos por IA externos para mantener lógica inteligente local pura e infalible
 sealed class Screen {
@@ -58,7 +65,51 @@ data class MonthProjection(
     val projectedMonthEndBalance: Double
 )
 
-class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
+class FinanceViewModel(
+    val repository: FinanceRepository,
+    val database: FinanceDatabase
+) : ViewModel() {
+
+    val currentSortOrder = mutableStateOf(SortOrder.BY_DATE)
+
+    val backupManager by lazy { BackupManager(repository, database) }
+
+    suspend fun exportDataJson(context: Context): String {
+        return backupManager.exportBackup(context)
+    }
+
+    suspend fun importDataJson(json: String): Boolean {
+        val success = backupManager.importBackup(json)
+        if (success) {
+            val profile = repository.getProfileDirect()
+            if (profile != null && !profile.isWizardComplete) {
+                val updatedProfile = profile.copy(isWizardComplete = true)
+                repository.saveFinancialProfile(updatedProfile)
+            }
+            runSmartAutoCheck()
+            _currentScreen.value = Screen.Dashboard
+        }
+        return success
+    }
+
+    fun hasLatestDailyBackup(context: Context): Boolean {
+        return backupManager.hasLatestDailyBackup(context)
+    }
+
+    suspend fun restoreLatestDailyBackup(context: Context): Boolean {
+        val success = backupManager.restoreLatestBackup(context)
+        if (success) {
+            val profile = repository.getProfileDirect()
+            if (profile != null && !profile.isWizardComplete) {
+                val updatedProfile = profile.copy(isWizardComplete = true)
+                repository.saveFinancialProfile(updatedProfile)
+            }
+            runSmartAutoCheck()
+            _currentScreen.value = Screen.Dashboard
+        }
+        return success
+    }
+
 
     // Current Screen Navigation Flow
     private val _currentScreen = MutableStateFlow<Screen>(Screen.WizardStep1)
@@ -203,11 +254,39 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
 
     fun updateDigitalBalanceInput(input: String) {
         _digitalBalanceInput.value = input
-        val parsed = input.toDoubleOrNull() ?: -1.0
+        val parsed = input.toDoubleOrNull() ?: 0.0
+        saveBankBalance(parsed)
+    }
+
+    fun updateBankBalanceDashboard(newBalance: Double) {
+        saveBankBalance(newBalance)
+    }
+
+    fun resetToWizard() {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect()
+            if (prof != null) {
+                repository.saveFinancialProfile(prof.copy(isWizardComplete = false))
+            }
+            _currentScreen.value = Screen.WizardStep1
+        }
+    }
+
+    fun saveBankBalance(newBalance: Double) {
+        val str = newBalance.toString()
+        val formattedStr = if (str.endsWith(".0")) str.substring(0, str.length - 2) else str
+        _digitalBalanceInput.value = formattedStr
         viewModelScope.launch {
             val existed = repository.getProfileDirect()
             if (existed != null) {
-                repository.saveFinancialProfile(existed.copy(currentBankBalance = parsed))
+                repository.saveFinancialProfile(existed.copy(currentBankBalance = newBalance))
+            } else {
+                repository.saveFinancialProfile(
+                    FinancialProfile(
+                        currentBankBalance = newBalance,
+                        isProUser = true
+                    )
+                )
             }
         }
     }
@@ -222,78 +301,87 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val dbCategories: StateFlow<List<ExpenseCategory>> = combine(repository.activeCategories, repository.financialProfile) { categories, profile ->
-        categories
+        categories.filter { !it.isArchived }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dbArchivedCategories: StateFlow<List<ExpenseCategory>> = repository.archivedCategories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val dbVariableExpenses: StateFlow<List<VariableExpenseEntry>> = repository.variableExpenses
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalGastosFijos: StateFlow<Double> = dbCategories
-        .map { categories -> categories.filter { it.isFixed && !it.assumedByPartner }.sumOf { it.limitAmount } }
+        .map { categories -> categories.filter { !it.isArchived && it.isFixed && !it.assumedByPartner && !it.isSkippedThisMonth }.sumOf { it.limitAmount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalGastosVariables: StateFlow<Double> = dbVariableExpenses
         .map { expenses -> expenses.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    fun isBillScheduledDateInPastOrToday(payDay: Int, incomeDay: Int): Boolean {
-        val today = java.util.Calendar.getInstance()
-        val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
+    fun shouldRetainUnpaidFixedExpense(payDay: Int?, incomeDay: Int): Boolean {
+        return true
+    }
 
-        val startFinancialCalendar = java.util.Calendar.getInstance()
-        val m1: Int
-        val y1: Int
-        if (todayDay >= incomeDay) {
-            m1 = today.get(java.util.Calendar.MONTH)
-            y1 = today.get(java.util.Calendar.YEAR)
-        } else {
-            startFinancialCalendar.add(java.util.Calendar.MONTH, -1)
-            m1 = startFinancialCalendar.get(java.util.Calendar.MONTH)
-            y1 = startFinancialCalendar.get(java.util.Calendar.YEAR)
+    companion object {
+        fun isBillScheduledDateInPastOrToday(payDay: Int, incomeDay: Int): Boolean {
+            val today = java.util.Calendar.getInstance()
+            val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
+            
+            val startFinancialCalendar = java.util.Calendar.getInstance()
+            val m1: Int
+            val y1: Int
+            if (todayDay >= incomeDay) {
+                m1 = today.get(java.util.Calendar.MONTH)
+                y1 = today.get(java.util.Calendar.YEAR)
+            } else {
+                startFinancialCalendar.add(java.util.Calendar.MONTH, -1)
+                m1 = startFinancialCalendar.get(java.util.Calendar.MONTH)
+                y1 = startFinancialCalendar.get(java.util.Calendar.YEAR)
+            }
+            
+            val scheduled = java.util.Calendar.getInstance()
+            scheduled.clear()
+            
+            if (payDay >= incomeDay) {
+                scheduled.set(java.util.Calendar.YEAR, y1)
+                scheduled.set(java.util.Calendar.MONTH, m1)
+                val maxDays = scheduled.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                val finalDay = minOf(payDay, maxDays)
+                scheduled.set(java.util.Calendar.DAY_OF_MONTH, finalDay)
+            } else {
+                scheduled.set(java.util.Calendar.YEAR, y1)
+                scheduled.set(java.util.Calendar.MONTH, m1)
+                scheduled.add(java.util.Calendar.MONTH, 1)
+                val maxDays = scheduled.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                val finalDay = minOf(payDay, maxDays)
+                scheduled.set(java.util.Calendar.DAY_OF_MONTH, finalDay)
+            }
+            
+            val scheduledYear = scheduled.get(java.util.Calendar.YEAR)
+            val scheduledMonth = scheduled.get(java.util.Calendar.MONTH)
+            val scheduledDay = scheduled.get(java.util.Calendar.DAY_OF_MONTH)
+            
+            val todayYear = today.get(java.util.Calendar.YEAR)
+            val todayMonth = today.get(java.util.Calendar.MONTH)
+            val todayDayVal = today.get(java.util.Calendar.DAY_OF_MONTH)
+            
+            if (todayYear > scheduledYear) return true
+            if (todayYear < scheduledYear) return false
+            
+            if (todayMonth > scheduledMonth) return true
+            if (todayMonth < scheduledMonth) return false
+            
+            return todayDayVal >= scheduledDay
         }
-
-        val scheduled = java.util.Calendar.getInstance()
-        scheduled.clear()
-
-        if (payDay >= incomeDay) {
-            scheduled.set(java.util.Calendar.YEAR, y1)
-            scheduled.set(java.util.Calendar.MONTH, m1)
-            val maxDays = scheduled.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-            val finalDay = minOf(payDay, maxDays)
-            scheduled.set(java.util.Calendar.DAY_OF_MONTH, finalDay)
-        } else {
-            scheduled.set(java.util.Calendar.YEAR, y1)
-            scheduled.set(java.util.Calendar.MONTH, m1)
-            scheduled.add(java.util.Calendar.MONTH, 1)
-            val maxDays = scheduled.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-            val finalDay = minOf(payDay, maxDays)
-            scheduled.set(java.util.Calendar.DAY_OF_MONTH, finalDay)
-        }
-
-        val scheduledYear = scheduled.get(java.util.Calendar.YEAR)
-        val scheduledMonth = scheduled.get(java.util.Calendar.MONTH)
-        val scheduledDay = scheduled.get(java.util.Calendar.DAY_OF_MONTH)
-
-        val todayYear = today.get(java.util.Calendar.YEAR)
-        val todayMonth = today.get(java.util.Calendar.MONTH)
-        val todayDayVal = today.get(java.util.Calendar.DAY_OF_MONTH)
-
-        if (todayYear > scheduledYear) return true
-        if (todayYear < scheduledYear) return false
-
-        if (todayMonth > scheduledMonth) return true
-        if (todayMonth < scheduledMonth) return false
-
-        return todayDayVal >= scheduledDay
     }
 
     fun getFinancialCycleDays(incomeDay: Int): Triple<Int, Int, Int> {
         val today = java.util.Calendar.getInstance()
         val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
-
+        
         val startCal = java.util.Calendar.getInstance()
         val endCal = java.util.Calendar.getInstance()
-
+        
         if (todayDay >= incomeDay) {
             startCal.set(java.util.Calendar.DAY_OF_MONTH, incomeDay)
             endCal.set(java.util.Calendar.DAY_OF_MONTH, incomeDay)
@@ -305,52 +393,58 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
             endCal.set(java.util.Calendar.DAY_OF_MONTH, incomeDay)
             endCal.add(java.util.Calendar.DAY_OF_YEAR, -1)
         }
-
+        
         startCal.set(java.util.Calendar.HOUR_OF_DAY, 0)
         startCal.set(java.util.Calendar.MINUTE, 0)
         startCal.set(java.util.Calendar.SECOND, 0)
         startCal.set(java.util.Calendar.MILLISECOND, 0)
-
+        
         endCal.set(java.util.Calendar.HOUR_OF_DAY, 23)
         endCal.set(java.util.Calendar.MINUTE, 59)
         endCal.set(java.util.Calendar.SECOND, 59)
-
+        
         val todayTime = today.timeInMillis
         val startTime = startCal.timeInMillis
         val endTime = endCal.timeInMillis
-
+        
         val totalMs = endTime - startTime
         val totalDays = maxOf(1, (totalMs / (1000L * 60 * 60 * 24)).toInt() + 1)
-
+        
         val elapsedMs = maxOf(0L, todayTime - startTime)
         val elapsedDays = maxOf(1, (elapsedMs / (1000L * 60 * 60 * 24)).toInt() + 1)
-
+        
         val remainingDays = maxOf(0, totalDays - elapsedDays)
-
+        
         return Triple(elapsedDays, remainingDays, totalDays)
     }
 
     val saldoRestanteDisponible: StateFlow<Double> = combine(dbProfile, dbCategories, totalGastosVariables) { profile, categories, variable ->
         if (profile == null) 0.0
         else {
-            val useBankBalance = profile.currentBankBalance >= 0.0
-            val baseValue = if (useBankBalance) {
-                profile.currentBankBalance
-            } else {
-                profile.monthlyIncome + profile.partnerContribution
+            val baseIncome = profile.monthlyIncome + profile.partnerContribution
+            val isCustomBankBalance = profile.currentBankBalance >= 0.0
+            val baseValue = if (isCustomBankBalance) profile.currentBankBalance else baseIncome
+            
+            val pendingCategories = categories.filter { category ->
+                !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isPaid && !category.isSkippedThisMonth &&
+                shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay)
             }
 
-            val adjustedFixed = if (useBankBalance) {
-                categories.filter { category ->
-                    category.isFixed && !category.assumedByPartner && !category.isPaid
-                }.sumOf { it.limitAmount }
-            } else {
-                categories.filter { category ->
-                    category.isFixed && !category.assumedByPartner
-                }.sumOf { it.limitAmount }
+            val pendingFixed = pendingCategories.sumOf { category ->
+                if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
             }
+            
+            Log.d("FinanceDebug", "=== DEPURACION SALDO DISPONIBLE ===")
+            Log.d("FinanceDebug", "currentBankBalance=${profile.currentBankBalance}, baseIncome=$baseIncome, baseValue=$baseValue")
+            Log.d("FinanceDebug", "Total categorias recibidas: ${categories.size}")
+            pendingCategories.forEach { item ->
+                val calculatedAmount = if (item.rawAmount > 0.0 && item.billingCycle != "Mensual") item.rawAmount else item.limitAmount
+                Log.d("FinanceDebug", " - pendingFixed Item: name=${item.name}, id=${item.id}, amount=$calculatedAmount, isPaid=${item.isPaid}, isCash=${item.isCashPayment}, isSkipped=${item.isSkippedThisMonth}, isFixed=${item.isFixed}, isFinancing=${item.isFinancing}")
+            }
+            Log.d("FinanceDebug", "Suma total pendingFixed descontada: $pendingFixed")
+            Log.d("FinanceDebug", "Saldo Restante Disponible final: ${baseValue - pendingFixed}")
 
-            baseValue - adjustedFixed - variable
+            baseValue - pendingFixed
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
@@ -362,7 +456,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         if (profile == null) return@combine null
 
         val baseIncome = profile.monthlyIncome + profile.partnerContribution
-        val totalFixed = categories.filter { it.isFixed && !it.assumedByPartner }.sumOf { it.limitAmount }
+        val totalFixed = categories.filter { !it.isArchived && it.isFixed && !it.assumedByPartner && !it.isSkippedThisMonth }.sumOf { it.limitAmount }
         val totalVariable = variableExpenses.sumOf { it.amount }
 
         val cycleDays = getFinancialCycleDays(profile.incomeDay)
@@ -370,15 +464,27 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         val remainingDays = cycleDays.second
         val totalDaysInMonth = cycleDays.third
 
-        val averageDailyVariable = totalVariable / elapsedDays
-        val projectedVariable = totalVariable + (averageDailyVariable * remainingDays)
+        // We still calculate averageDailyVariable for statistical/display purposes
+        val averageDailyVariable = if (elapsedDays > 0) totalVariable / elapsedDays else 0.0
 
+        // Use the configured variable budget limit minus spent so far to project remaining expenses safely
+        val totalVariableBudget = categories.filter { !it.isArchived && !it.isFixed && it.isAdded }.sumOf { it.limitAmount }
+        val projectedRemainingVariable = maxOf(0.0, totalVariableBudget - totalVariable)
+        val projectedVariable = totalVariable + projectedRemainingVariable
+        
+        val isCustomBankBalance = profile.currentBankBalance >= 0.0
+        // Exact same calculation logic for pending fixed expenses (Single Source of Truth)
         val pendingFixed = categories.filter { category ->
-            category.isFixed && !category.assumedByPartner && !category.isPaid
-        }.sumOf { it.limitAmount }
+            !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isSkippedThisMonth && !category.isPaid &&
+                shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay)
+        }.sumOf { category ->
+            if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
+        }
+
+        val bankBalance = if (isCustomBankBalance) profile.currentBankBalance else baseIncome
+        val projectedMonthEndBalance = bankBalance - pendingFixed - projectedRemainingVariable
 
         val projectedMonthEndSpent = projectedVariable + totalFixed
-        val projectedMonthEndBalance = baseIncome - projectedMonthEndSpent
 
         MonthProjection(
             baseIncome = baseIncome,
@@ -402,24 +508,8 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun runSmartAutoCheck() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val categories = repository.getAllCategoriesDirect()
-                val profile = repository.getProfileDirect() ?: return@withContext
-                val incomeDay = profile.incomeDay
-                val toUpdate = categories.filter { category ->
-                    category.isFixed &&
-                            category.isAdded &&
-                            category.payDay != null &&
-                            isBillScheduledDateInPastOrToday(category.payDay, incomeDay) &&
-                            !category.isPaid
-                }
-                if (toUpdate.isNotEmpty()) {
-                    val updated = toUpdate.map { it.copy(isPaid = true) }
-                    repository.saveCategories(updated)
-                }
-            }
-        }
+        // No-op: Marking as paid is strictly a manual user action or bank notification action.
+        // Monthly resets are handled by startNewMonth(). We preserve user manual checks.
     }
 
     fun toggleCategoryIsVariableBill(id: String, isVariable: Boolean) {
@@ -442,54 +532,128 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         }
     }
 
-    fun addFixedBillDb(name: String, amount: Double, isFinancing: Boolean, monthsRemaining: Int?, payDay: Int?) {
+    fun addFixedBillDb(
+        name: String,
+        amount: Double,
+        isFinancing: Boolean,
+        monthsRemaining: Int?,
+        payDay: Int?,
+        billingCycle: String = "Mensual",
+        isInsurance: Boolean = false,
+        isCashPayment: Boolean = false,
+        totalInstallments: Int? = null,
+        currentInstallment: Int? = null,
+        financingStartDate: Long? = null
+    ) {
         viewModelScope.launch {
             val id = "fixed_${java.util.UUID.randomUUID()}"
             val profile = repository.getProfileDirect()
             val isPro = true
             val categories = repository.getAllCategoriesDirect().filter { it.isAdded }
             val existingFinancing = categories.count { it.isFinancing }
-
+            
             val finalIsFinancing = if (!isPro && existingFinancing >= 2) false else isFinancing
             val finalMonths = if (finalIsFinancing) monthsRemaining else null
+            val finalTotal = if (finalIsFinancing) (totalInstallments ?: finalMonths) else null
+            val finalCurrent = if (finalIsFinancing) (currentInstallment ?: 1) else null
+            val finalStart = if (finalIsFinancing) (financingStartDate ?: System.currentTimeMillis()) else null
+            val detectedInsurance = isInsurance || name.contains("seguro", ignoreCase = true) || name.contains("póliza", ignoreCase = true) || name.contains("poliza", ignoreCase = true) || name.contains("sanitas", ignoreCase = true) || name.contains("axa", ignoreCase = true) || name.contains("mapfre", ignoreCase = true) || name.contains("mutua", ignoreCase = true)
 
+            val monthlyLimit = when (com.example.data.BillingFrequency.fromString(billingCycle)) {
+                com.example.data.BillingFrequency.MENSUAL -> amount
+                com.example.data.BillingFrequency.BIMENSUAL -> amount / 2.0
+                com.example.data.BillingFrequency.TRIMESTRAL -> amount / 3.0
+                com.example.data.BillingFrequency.ANUAL -> amount / 12.0
+            }
+
+            val isFinishedFinancing = finalIsFinancing && finalMonths != null && finalMonths <= 0
             repository.saveCategory(
                 com.example.data.ExpenseCategory(
                     id = id,
                     name = name,
-                    limitAmount = amount,
+                    limitAmount = monthlyLimit,
                     isFixed = true,
                     rawAmount = amount,
-                    isAdded = true,
+                    isAdded = !isFinishedFinancing,
                     isFinancing = finalIsFinancing,
-                    monthsRemaining = finalMonths,
-                    payDay = payDay
+                    monthsRemaining = if (isFinishedFinancing) 0 else finalMonths,
+                    totalInstallments = finalTotal,
+                    currentInstallment = finalCurrent,
+                    financingStartDate = finalStart,
+                    payDay = payDay,
+                    billingCycle = billingCycle,
+                    isInsurance = detectedInsurance,
+                    isCashPayment = isCashPayment,
+                    isArchived = isFinishedFinancing
                 )
             )
+            runSmartAutoCheck()
         }
     }
 
-    fun updateFixedBillDb(id: String, name: String, amount: Double, isFinancing: Boolean, monthsRemaining: Int?, payDay: Int?) {
+    fun updateFixedBillDb(
+        id: String,
+        name: String,
+        amount: Double,
+        isFinancing: Boolean,
+        monthsRemaining: Int?,
+        payDay: Int?,
+        billingCycle: String = "Mensual",
+        isInsurance: Boolean = false,
+        isCashPayment: Boolean = false,
+        totalInstallments: Int? = null,
+        currentInstallment: Int? = null,
+        financingStartDate: Long? = null
+    ) {
         viewModelScope.launch {
             val existed = repository.getAllCategoriesDirect().find { it.id == id } ?: return@launch
             val profile = repository.getProfileDirect()
             val isPro = true
             val categories = repository.getAllCategoriesDirect().filter { it.id != id && it.isAdded }
             val existingFinancing = categories.count { it.isFinancing }
-
+            
             val finalIsFinancing = if (!isPro && existingFinancing >= 2) false else isFinancing
             val finalMonths = if (finalIsFinancing) monthsRemaining else null
+            val finalTotal = if (finalIsFinancing) (totalInstallments ?: existed.totalInstallments ?: finalMonths) else null
+            val finalCurrent = if (finalIsFinancing) (currentInstallment ?: existed.currentInstallment ?: 1) else null
+            val finalStart = if (finalIsFinancing) (financingStartDate ?: existed.financingStartDate ?: System.currentTimeMillis()) else null
+            val detectedInsurance = isInsurance || name.contains("seguro", ignoreCase = true) || name.contains("póliza", ignoreCase = true) || name.contains("poliza", ignoreCase = true) || name.contains("sanitas", ignoreCase = true) || name.contains("axa", ignoreCase = true) || name.contains("mapfre", ignoreCase = true) || name.contains("mutua", ignoreCase = true)
 
+            val monthlyLimit = when (com.example.data.BillingFrequency.fromString(billingCycle)) {
+                com.example.data.BillingFrequency.MENSUAL -> amount
+                com.example.data.BillingFrequency.BIMENSUAL -> amount / 2.0
+                com.example.data.BillingFrequency.TRIMESTRAL -> amount / 3.0
+                com.example.data.BillingFrequency.ANUAL -> amount / 12.0
+            }
+
+            val isFinishedFinancing = finalIsFinancing && finalMonths != null && finalMonths <= 0
             repository.saveCategory(
                 existed.copy(
                     name = name,
-                    limitAmount = amount,
+                    limitAmount = monthlyLimit,
                     rawAmount = amount,
+                    isAdded = if (isFinishedFinancing) false else existed.isAdded,
                     isFinancing = finalIsFinancing,
-                    monthsRemaining = finalMonths,
-                    payDay = payDay
+                    monthsRemaining = if (isFinishedFinancing) 0 else finalMonths,
+                    totalInstallments = finalTotal,
+                    currentInstallment = finalCurrent,
+                    financingStartDate = finalStart,
+                    payDay = payDay,
+                    billingCycle = billingCycle,
+                    isInsurance = detectedInsurance,
+                    isCashPayment = isCashPayment,
+                    isArchived = if (isFinishedFinancing) true else existed.isArchived
                 )
             )
+            runSmartAutoCheck()
+        }
+    }
+
+    fun toggleCashPayment(id: String, isCash: Boolean) {
+        viewModelScope.launch {
+            val existed = repository.getAllCategoriesDirect().find { it.id == id } ?: return@launch
+            repository.saveCategory(existed.copy(isCashPayment = isCash))
+            runSmartAutoCheck()
         }
     }
 
@@ -528,67 +692,54 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         }
     }
 
-    fun startNewMonth() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val categories = repository.getAllCategoriesDirect()
-                val profile = repository.getProfileDirect()
-                val isPro = true
-
-                var financingCount = 0
-                val resetCategories = categories.map { category ->
-                    if (category.isFixed) {
-                        if (category.isFinancing) {
-                            financingCount++
-                            if (!isPro && financingCount > 2) {
-                                // Excess financing for free users - disable to prevent ghost subtractions
-                                category.copy(isAdded = false, isPaid = false)
+    fun startNewMonth(): kotlinx.coroutines.Job = viewModelScope.launch {
+        val categories = repository.getAllCategoriesDirect()
+        val profile = repository.getProfileDirect()
+        val isPro = true
+        
+        var financingCount = 0
+        val resetCategories = categories.map { category ->
+            if (category.isFixed) {
+                val base = category.copy(isSkippedThisMonth = false, isPaid = false)
+                if (category.isFinancing) {
+                    financingCount++
+                    if (!isPro && financingCount > 2) {
+                        // Excess financing for free users - disable to prevent ghost subtractions
+                        base.copy(isAdded = false)
+                    } else {
+                        val rem = category.monthsRemaining
+                        if (rem != null) {
+                            val nextRem = rem - 1
+                            val nextCurrent = (category.currentInstallment ?: category.effectiveCurrentInstallment) + 1
+                            if (nextRem <= 0) {
+                                base.copy(isAdded = false, monthsRemaining = 0, isArchived = true, currentInstallment = category.effectiveTotalInstallments)
                             } else {
-                                val rem = category.monthsRemaining
-                                if (rem != null) {
-                                    val nextRem = rem - 1
-                                    if (nextRem <= 0) {
-                                        category.copy(isAdded = false, monthsRemaining = 0, isPaid = false)
-                                    } else {
-                                        category.copy(monthsRemaining = nextRem, isPaid = false)
-                                    }
-                                } else {
-                                    category.copy(isPaid = false)
-                                }
+                                base.copy(monthsRemaining = nextRem, currentInstallment = nextCurrent)
                             }
                         } else {
-                            category.copy(isPaid = false)
+                            base
                         }
-                    } else {
-                        category
                     }
+                } else {
+                    base
                 }
-                repository.saveCategories(resetCategories)
-                repository.clearVariableExpensesOnly()
-
-                if (profile != null) {
-                    val today = java.util.Calendar.getInstance()
-                    val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
-                    val incomeDay = profile.incomeDay
-                    val m1: Int
-                    val y1: Int
-                    if (todayDay >= incomeDay) {
-                        m1 = today.get(java.util.Calendar.MONTH) + 1
-                        y1 = today.get(java.util.Calendar.YEAR)
-                    } else {
-                        val tempCal = java.util.Calendar.getInstance()
-                        tempCal.add(java.util.Calendar.MONTH, -1)
-                        m1 = tempCal.get(java.util.Calendar.MONTH) + 1
-                        y1 = tempCal.get(java.util.Calendar.YEAR)
-                    }
-                    repository.saveFinancialProfile(profile.copy(
-                        lastActiveYear = y1,
-                        lastActiveMonth = m1
-                    ))
-                }
+            } else {
+                category
             }
-            runSmartAutoCheck()
         }
+        repository.saveCategories(resetCategories)
+        repository.clearVariableExpensesOnly()
+
+        if (profile != null) {
+            val today = java.util.Calendar.getInstance()
+            val m1 = today.get(java.util.Calendar.MONTH) + 1
+            val y1 = today.get(java.util.Calendar.YEAR)
+            repository.saveFinancialProfile(profile.copy(
+                lastActiveYear = y1,
+                lastActiveMonth = m1
+            ))
+        }
+        runSmartAutoCheck()
     }
 
     private fun checkAndHandleMonthRollover(profile: FinancialProfile) {
@@ -597,20 +748,8 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         isRolloverChecked = true
 
         val today = java.util.Calendar.getInstance()
-        val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
-        val incomeDay = profile.incomeDay
-
-        val m1: Int
-        val y1: Int
-        if (todayDay >= incomeDay) {
-            m1 = today.get(java.util.Calendar.MONTH) + 1
-            y1 = today.get(java.util.Calendar.YEAR)
-        } else {
-            val tempCal = java.util.Calendar.getInstance()
-            tempCal.add(java.util.Calendar.MONTH, -1)
-            m1 = tempCal.get(java.util.Calendar.MONTH) + 1
-            y1 = tempCal.get(java.util.Calendar.YEAR)
-        }
+        val m1 = today.get(java.util.Calendar.MONTH) + 1
+        val y1 = today.get(java.util.Calendar.YEAR)
 
         viewModelScope.launch {
             if (profile.lastActiveYear == 0 && profile.lastActiveMonth == 0) {
@@ -629,19 +768,22 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     init {
+        runSmartAutoCheck()
+
         // Observe DB to check if wizard is complete and synchronize state
         viewModelScope.launch {
             repository.financialProfile.collect { profile ->
                 if (profile != null) {
                     checkAndHandleMonthRollover(profile)
+                    runSmartAutoCheck()
                     // Prepopulate values if found
                     _incomeInput.value = if (profile.monthlyIncome > 0) profile.monthlyIncome.toString() else ""
                     _incomeDayInput.value = profile.incomeDay.toString()
-                    _wizardBankBalanceInput.value = if (profile.currentBankBalance >= 0.0) {
+                    _wizardBankBalanceInput.value = if (profile.currentBankBalance > 0.0) {
                         val str = profile.currentBankBalance.toString()
                         if (str.endsWith(".0")) str.substring(0, str.length - 2) else str
                     } else ""
-                    if (profile.currentBankBalance >= 0.0) {
+                    if (profile.currentBankBalance > 0.0) {
                         val str = profile.currentBankBalance.toString()
                         _digitalBalanceInput.value = if (str.endsWith(".0")) str.substring(0, str.length - 2) else str
                     }
@@ -680,6 +822,9 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         // Prepopulate based on existing categories if wizard is complete
         viewModelScope.launch {
             repository.activeCategories.collect { categories ->
+                if (categories.isNotEmpty()) {
+                    runSmartAutoCheck()
+                }
                 if (categories.isNotEmpty() && dbProfile.value?.isWizardComplete == true) {
                     // Populate stream active statuses from DB
                     categories.find { it.id == "netflix" }?.let {
@@ -722,11 +867,11 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
 
     // Step 1 Actions
     fun setIncomeInput(input: String) {
-        _incomeInput.value = input.filter { it.isDigit() || it == '.' }
+        _incomeInput.value = input.replace(',', '.').filter { it.isDigit() || it == '.' }
     }
 
     fun setWizardBankBalanceInput(input: String) {
-        _wizardBankBalanceInput.value = input.filter { it.isDigit() || it == '.' }
+        _wizardBankBalanceInput.value = input.replace(',', '.').filter { it.isDigit() || it == '.' }
     }
 
     fun updateIncomeDayInput(input: String) {
@@ -762,7 +907,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         _fixedExpenses.value = _fixedExpenses.value.map { item ->
             if (item.id == id) item.copy(
                 name = name,
-                amount = amount.filter { it.isDigit() || it == '.' },
+                amount = amount.replace(',', '.').filter { it.isDigit() || it == '.' },
                 payDay = payDay.filter { it.isDigit() }
             ) else item
         }
@@ -784,7 +929,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     // Step 3 Actions (Variable Budgets editing)
     fun updateVariableBudget(id: String, name: String, amount: String) {
         _variableBudgets.value = _variableBudgets.value.map { item ->
-            if (item.id == id) item.copy(name = name, amount = amount.filter { it.isDigit() || it == '.' }) else item
+            if (item.id == id) item.copy(name = name, amount = amount.replace(',', '.').filter { it.isDigit() || it == '.' }) else item
         }
     }
 
@@ -803,47 +948,47 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
 
     // Step 4 Actions & Accordion state modifications
     fun setHasPets(value: Boolean) { _hasPets.value = value }
-    fun setPetsCost(valStr: String) { _petsCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setPetsCost(valStr: String) { _petsCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setHasKids(value: Boolean) { _hasKids.value = value }
-    fun setKidsCost(valStr: String) { _kidsCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setKidsCost(valStr: String) { _kidsCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setSharedExpenses(value: Boolean) { _sharedExpenses.value = value }
-    fun setPartnerContribution(valStr: String) { _partnerContribution.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setPartnerContribution(valStr: String) { _partnerContribution.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setWaterBilling(billing: String) { _waterBilling.value = billing }
-    fun setWaterCost(valStr: String) { _waterCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setWaterCost(valStr: String) { _waterCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
     fun setWaterEnabled(value: Boolean) { _isWaterEnabled.value = value }
     fun setWaterPayDay(value: String) { _waterPayDayValue.value = value.filter { it.isDigit() } }
 
     fun setElectricityBilling(billing: String) { _electricityBilling.value = billing }
-    fun setElectricityCost(valStr: String) { _electricityCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setElectricityCost(valStr: String) { _electricityCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
     fun setElectricityEnabled(value: Boolean) { _isElectricityEnabled.value = value }
     fun setElectricityPayDay(value: String) { _electricityPayDayValue.value = value.filter { it.isDigit() } }
 
     fun setNetflixActive(value: Boolean) { _netflixActive.value = value }
-    fun setNetflixCost(valStr: String) { _netflixCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setNetflixCost(valStr: String) { _netflixCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setHboActive(value: Boolean) { _hboActive.value = value }
-    fun setHboCost(valStr: String) { _hboCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setHboCost(valStr: String) { _hboCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setDisneyActive(value: Boolean) { _disneyActive.value = value }
-    fun setDisneyCost(valStr: String) { _disneyCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setDisneyCost(valStr: String) { _disneyCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setJuegosActive(value: Boolean) { _juegosActive.value = value }
-    fun setJuegosCost(valStr: String) { _juegosCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setJuegosCost(valStr: String) { _juegosCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setAmazonPrimeActive(value: Boolean) { _amazonPrimeActive.value = value }
-    fun setAmazonPrimeCost(valStr: String) { _amazonPrimeCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setAmazonPrimeCost(valStr: String) { _amazonPrimeCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setSpotifyActive(value: Boolean) { _spotifyActive.value = value }
-    fun setSpotifyCost(valStr: String) { _spotifyCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setSpotifyCost(valStr: String) { _spotifyCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setYoutubePremiumActive(value: Boolean) { _youtubePremiumActive.value = value }
-    fun setYoutubePremiumCost(valStr: String) { _youtubePremiumCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setYoutubePremiumCost(valStr: String) { _youtubePremiumCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun setYoutubeMusicActive(value: Boolean) { _youtubeMusicActive.value = value }
-    fun setYoutubeMusicCost(valStr: String) { _youtubeMusicCost.value = valStr.filter { it.isDigit() || it == '.' } }
+    fun setYoutubeMusicCost(valStr: String) { _youtubeMusicCost.value = valStr.replace(',', '.').filter { it.isDigit() || it == '.' } }
 
     fun addCustomSubscription() {
         val uniqueId = "custom_sub_${UUID.randomUUID()}"
@@ -852,7 +997,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
 
     fun updateCustomSubscription(id: String, name: String, amount: String) {
         _customStreams.value = _customStreams.value.map { item ->
-            if (item.id == id) item.copy(name = name, amount = amount.filter { it.isDigit() || it == '.' }) else item
+            if (item.id == id) item.copy(name = name, amount = amount.replace(',', '.').filter { it.isDigit() || it == '.' }) else item
         }
     }
 
@@ -960,7 +1105,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
             // 5. Electricity Predefined Supply
             if (_isElectricityEnabled.value) {
                 val cycle = _electricityBilling.value
-                val limit = if (cycle == "Bimensual") eleVal / 2.0 else eleVal
+                val limit = eleVal
                 val pd = _electricityPayDayValue.value.toIntOrNull()?.coerceIn(1, 31)
                 categoriesToInsert.add(
                     ExpenseCategory(
@@ -981,7 +1126,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
             // 6. Water Predefined Supply
             if (_isWaterEnabled.value) {
                 val cycle = _waterBilling.value
-                val limit = if (cycle == "Bimensual") waterVal / 2.0 else waterVal
+                val limit = waterVal
                 val pd = _waterPayDayValue.value.toIntOrNull()?.coerceIn(1, 31)
                 categoriesToInsert.add(
                     ExpenseCategory(
@@ -1143,9 +1288,89 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     // Interactive Dashboard Controls - real-time calculations as requested!
+    fun setCategoryArchived(id: String, isArchived: Boolean): kotlinx.coroutines.Job = viewModelScope.launch {
+        repository.setCategoryArchived(id, isArchived)
+    }
+
+    fun archiveCategory(id: String): kotlinx.coroutines.Job = viewModelScope.launch {
+        repository.archiveCategory(id)
+    }
+
+    fun unarchiveCategory(id: String): kotlinx.coroutines.Job = viewModelScope.launch {
+        repository.unarchiveCategory(id)
+    }
+
+    fun deleteArchivedCategoryPermanent(id: String): kotlinx.coroutines.Job = viewModelScope.launch {
+        repository.deleteCategory(id)
+    }
+
+    fun payFinancingInstallment(id: String): kotlinx.coroutines.Job = viewModelScope.launch {
+        val categories = repository.getAllCategoriesDirect()
+        val cat = categories.find { it.id == id } ?: return@launch
+        if (cat.isFinancing && cat.monthsRemaining != null) {
+            val nextRem = cat.monthsRemaining - 1
+            val nextCurrent = (cat.currentInstallment ?: cat.effectiveCurrentInstallment) + 1
+            if (nextRem <= 0) {
+                repository.saveCategory(
+                    cat.copy(
+                        monthsRemaining = 0,
+                        isPaid = true,
+                        isAdded = false,
+                        isArchived = true,
+                        currentInstallment = cat.effectiveTotalInstallments
+                    )
+                )
+            } else {
+                repository.saveCategory(
+                    cat.copy(
+                        monthsRemaining = nextRem,
+                        isPaid = true,
+                        currentInstallment = nextCurrent
+                    )
+                )
+            }
+            runSmartAutoCheck()
+        }
+    }
+
+    fun checkAndArchiveFinishedFinancings(): kotlinx.coroutines.Job = viewModelScope.launch {
+        val categories = repository.getAllCategoriesDirect()
+        val finishedFinancings = categories.filter {
+            it.isFinancing && it.monthsRemaining != null && it.monthsRemaining <= 0 && !it.isArchived
+        }
+        if (finishedFinancings.isNotEmpty()) {
+            val updated = categories.map { cat ->
+                if (cat.isFinancing && cat.monthsRemaining != null && cat.monthsRemaining <= 0 && !cat.isArchived) {
+                    cat.copy(isArchived = true, isAdded = false, monthsRemaining = 0)
+                } else {
+                    cat
+                }
+            }
+            repository.saveCategories(updated)
+            runSmartAutoCheck()
+        }
+    }
+
     fun setGastoFijoPaid(id: String, paid: Boolean) {
         viewModelScope.launch {
+            val categories = repository.getAllCategoriesDirect()
+            val cat = categories.find { it.id == id }
+            val currentPaidState = cat?.isPaid ?: false
+
             repository.setCategoryPaid(id, paid)
+
+            if (cat != null && currentPaidState != paid) {
+                val profile = repository.getProfileDirect()
+                if (profile != null && profile.currentBankBalance >= 0.0) {
+                    val amount = if (cat.rawAmount > 0.0 && cat.billingCycle != "Mensual") cat.rawAmount else cat.limitAmount
+                    val newBalance = if (paid) {
+                        maxOf(0.0, profile.currentBankBalance - amount)
+                    } else {
+                        profile.currentBankBalance + amount
+                    }
+                    repository.saveFinancialProfile(profile.copy(currentBankBalance = newBalance))
+                }
+            }
         }
     }
 
@@ -1176,14 +1401,14 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun updatePetsCostDashboard(costStr: String) {
-        val filtered = costStr.filter { it.isDigit() || it == '.' }
+        val filtered = costStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         _petsCost.value = filtered
         val price = filtered.toDoubleOrNull() ?: 30.0
         if (_hasPets.value) {
             viewModelScope.launch {
                 val prof = repository.getProfileDirect() ?: return@launch
                 repository.saveFinancialProfile(prof.copy(petsCost = price))
-
+                
                 val currentCategory = repository.getAllCategoriesDirect().find { it.id == "mascotas" }
                 val isPaid = currentCategory?.isPaid ?: false
                 repository.saveCategory(
@@ -1228,14 +1453,14 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun updateKidsCostDashboard(costStr: String) {
-        val filtered = costStr.filter { it.isDigit() || it == '.' }
+        val filtered = costStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         _kidsCost.value = filtered
         val price = filtered.toDoubleOrNull() ?: 150.0
         if (_hasKids.value) {
             viewModelScope.launch {
                 val prof = repository.getProfileDirect() ?: return@launch
                 repository.saveFinancialProfile(prof.copy(kidsCost = price))
-
+                
                 val currentCategory = repository.getAllCategoriesDirect().find { it.id == "hijos" }
                 val isPaid = currentCategory?.isPaid ?: false
                 repository.saveCategory(
@@ -1262,7 +1487,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun updatePartnerContributionDashboard(contribStr: String) {
-        val filtered = contribStr.filter { it.isDigit() || it == '.' }
+        val filtered = contribStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         _partnerContribution.value = filtered
         val contrib = filtered.toDoubleOrNull() ?: 0.0
         viewModelScope.launch {
@@ -1278,6 +1503,13 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         }
     }
 
+    fun toggleCategorySkippedThisMonth(id: String, skipped: Boolean) {
+        viewModelScope.launch {
+            val existed = repository.getAllCategoriesDirect().find { it.id == id } ?: return@launch
+            repository.saveCategory(existed.copy(isSkippedThisMonth = skipped))
+        }
+    }
+
     // Predefined supplies billing cycles changes
     fun toggleWaterSupplyDashboard(active: Boolean) {
         _isWaterEnabled.value = active
@@ -1287,7 +1519,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
             if (active) {
                 val cost = _waterCost.value.toDoubleOrNull() ?: 40.0
                 val cycle = _waterBilling.value
-                val limit = if (cycle == "Bimensual") cost / 2.0 else cost
+                val limit = cost
                 repository.saveCategory(
                     ExpenseCategory(
                         id = "agua",
@@ -1312,8 +1544,8 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
                 val prof = repository.getProfileDirect() ?: return@launch
                 repository.saveFinancialProfile(prof.copy(waterBilling = cycle))
                 val cost = _waterCost.value.toDoubleOrNull() ?: 40.0
-                val limit = if (cycle == "Bimensual") cost / 2.0 else cost
-
+                val limit = cost
+                
                 val currentCategory = repository.getAllCategoriesDirect().find { it.id == "agua" }
                 val isPaid = currentCategory?.isPaid ?: false
                 repository.saveCategory(
@@ -1333,7 +1565,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun updateWaterCostDashboard(costStr: String) {
-        val filtered = costStr.filter { it.isDigit() || it == '.' }
+        val filtered = costStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         _waterCost.value = filtered
         val cost = filtered.toDoubleOrNull() ?: 40.0
         if (_isWaterEnabled.value) {
@@ -1341,8 +1573,8 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
                 val prof = repository.getProfileDirect() ?: return@launch
                 repository.saveFinancialProfile(prof.copy(waterCost = cost))
                 val cycle = _waterBilling.value
-                val limit = if (cycle == "Bimensual") cost / 2.0 else cost
-
+                val limit = cost
+                
                 val currentCategory = repository.getAllCategoriesDirect().find { it.id == "agua" }
                 val isPaid = currentCategory?.isPaid ?: false
                 repository.saveCategory(
@@ -1370,7 +1602,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
             if (active) {
                 val cost = _electricityCost.value.toDoubleOrNull() ?: 60.0
                 val cycle = _electricityBilling.value
-                val limit = if (cycle == "Bimensual") cost / 2.0 else cost
+                val limit = cost
                 repository.saveCategory(
                     ExpenseCategory(
                         id = "luz",
@@ -1395,8 +1627,8 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
                 val prof = repository.getProfileDirect() ?: return@launch
                 repository.saveFinancialProfile(prof.copy(electricityBilling = cycle))
                 val cost = _electricityCost.value.toDoubleOrNull() ?: 60.0
-                val limit = if (cycle == "Bimensual") cost / 2.0 else cost
-
+                val limit = cost
+                
                 val currentCategory = repository.getAllCategoriesDirect().find { it.id == "luz" }
                 val isPaid = currentCategory?.isPaid ?: false
                 repository.saveCategory(
@@ -1416,7 +1648,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun updateElectricityCostDashboard(costStr: String) {
-        val filtered = costStr.filter { it.isDigit() || it == '.' }
+        val filtered = costStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         _electricityCost.value = filtered
         val cost = filtered.toDoubleOrNull() ?: 60.0
         if (_isElectricityEnabled.value) {
@@ -1424,8 +1656,8 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
                 val prof = repository.getProfileDirect() ?: return@launch
                 repository.saveFinancialProfile(prof.copy(electricityCost = cost))
                 val cycle = _electricityBilling.value
-                val limit = if (cycle == "Bimensual") cost / 2.0 else cost
-
+                val limit = cost
+                
                 val currentCategory = repository.getAllCategoriesDirect().find { it.id == "luz" }
                 val isPaid = currentCategory?.isPaid ?: false
                 repository.saveCategory(
@@ -1457,7 +1689,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
             "youtube_music" -> _youtubeMusicActive.value = active
         }
 
-        val amt = priceStr.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0
+        val amt = priceStr.replace(',', '.').filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0
         viewModelScope.launch {
             if (active) {
                 repository.saveCategory(
@@ -1493,7 +1725,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     }
 
     fun updateStreamingCostDashboard(id: String, priceStr: String, defaultName: String) {
-        val filtered = priceStr.filter { it.isDigit() || it == '.' }
+        val filtered = priceStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         when (id) {
             "netflix" -> _netflixCost.value = filtered
             "hbo_max" -> _hboCost.value = filtered
@@ -1525,7 +1757,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
 
     fun addNewCustomSubDashboard(name: String, priceStr: String) {
         val uniqueId = "custom_sub_${UUID.randomUUID()}"
-        val filtered = priceStr.filter { it.isDigit() || it == '.' }
+        val filtered = priceStr.replace(',', '.').filter { it.isDigit() || it == '.' }
         val amt = filtered.toDoubleOrNull() ?: 0.0
         viewModelScope.launch {
             repository.saveCategory(
@@ -1615,7 +1847,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     fun setHideNewMonthBanner(hide: Boolean) {
         _hideNewMonthBanner.value = hide
         viewModelScope.launch {
-            val prof = repository.getProfileDirect() ?: return@launch
+            val prof = repository.getProfileDirect() ?: com.example.data.FinancialProfile()
             repository.saveFinancialProfile(prof.copy(hideNewMonthBanner = hide))
         }
     }
@@ -1623,7 +1855,7 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
     fun setHideSmartCalendarBanner(hide: Boolean) {
         _hideSmartCalendarBanner.value = hide
         viewModelScope.launch {
-            val prof = repository.getProfileDirect() ?: return@launch
+            val prof = repository.getProfileDirect() ?: com.example.data.FinancialProfile()
             repository.saveFinancialProfile(prof.copy(hideSmartCalendarBanner = hide))
         }
     }
@@ -1632,6 +1864,13 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         viewModelScope.launch {
             val prof = repository.getProfileDirect() ?: return@launch
             repository.saveFinancialProfile(prof.copy(selectedTheme = theme))
+        }
+    }
+
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: return@launch
+            repository.saveFinancialProfile(prof.copy(themeMode = mode))
         }
     }
 
@@ -1656,10 +1895,61 @@ class FinanceViewModel(val repository: FinanceRepository) : ViewModel() {
         }
     }
 
+    fun updateFullUserProfile(userName: String, avatarId: String, customAvatarUri: String, income: Double, day: Int) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: FinancialProfile()
+            repository.saveFinancialProfile(
+                prof.copy(
+                    userName = userName,
+                    avatarId = avatarId,
+                    customAvatarUri = customAvatarUri,
+                    monthlyIncome = income,
+                    incomeDay = day
+                )
+            )
+        }
+    }
+
     fun setProUserStatus(isPro: Boolean) {
         viewModelScope.launch {
             val prof = repository.getProfileDirect() ?: FinancialProfile()
             repository.saveFinancialProfile(prof.copy(isProUser = true))
+        }
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: return@launch
+            repository.saveFinancialProfile(prof.copy(isBiometricEnabled = enabled))
+        }
+    }
+
+    fun setPaymentNotificationsEnabled(enabled: Boolean, hoursLead: Int = 48) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: return@launch
+            repository.saveFinancialProfile(prof.copy(isPaymentNotificationsEnabled = enabled, paymentNotificationHoursLead = hoursLead))
+        }
+    }
+
+    fun setCustomCycleStartDay(day: Int) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: return@launch
+            val safeDay = day.coerceIn(1, 31)
+            repository.saveFinancialProfile(prof.copy(customCycleStartDay = safeDay, incomeDay = safeDay))
+        }
+    }
+
+    fun setHighPerformanceMode(enabled: Boolean) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: return@launch
+            repository.saveFinancialProfile(prof.copy(isHighPerformanceMode = enabled))
+        }
+    }
+
+    fun setBankNotificationInterceptorEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val prof = repository.getProfileDirect() ?: return@launch
+            repository.saveFinancialProfile(prof.copy(isBankNotificationInterceptorEnabled = enabled))
         }
     }
 }

@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="110dp"
+    android:viewportWidth="250"
+    android:viewportHeight="110">
+    <!-- Rounded Background (Slate Dark #0F172A) -->
+    <path
+        android:pathData="M 12 0 L 238 0 A 12 12 0 0 1 250 12 L 250 98 A 12 12 0 0 1 238 110 L 12 110 A 12 12 0 0 1 0 98 L 0 12 A 12 12 0 0 1 12 0 Z"
+        android:fillColor="#0F172A"/>
+    <!-- Title Line -->
+    <path
+        android:pathData="M 16 20 L 120 20 L 120 28 L 16 28 Z"
+        android:fillColor="#38BDF8"/>
+    <!-- Balance Placeholder -->
+    <path
+        android:pathData="M 16 42 L 150 42 L 150 64 L 16 64 Z"
+        android:fillColor="#FFFFFF"/>
+    <!-- Status Badge -->
+    <path
+        android:pathData="M 16 78 Q 16 74 20 74 L 120 74 Q 124 74 124 78 L 124 90 Q 124 94 120 94 L 20 94 Q 16 94 16 90 Z"
+        android:fillColor="#0F766E"/>
+</vector>

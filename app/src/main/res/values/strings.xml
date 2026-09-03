@@ -1,9 +1,38 @@
 <resources>
     <string name="app_name">FinanceFlow</string>
     <string name="menu_profile">Perfil e Ingresos</string>
-    <string name="menu_wizard_fixed">Gastos fijos del Wizard</string>
-    <string name="menu_preferences">Preferencias de UI</string>
-    <string name="menu_about">Acerca de FinanceFlow</string>
-    <string name="menu_report_error">Reportar Errores 🐞</string>
-    <string name="menu_database">Base de Datos</string>
+    <string name="menu_wizard_fixed">Ajustes de Fijos</string>
+    <string name="menu_preferences">Apariencia</string>
+    <string name="menu_about">Acerca de</string>
+    <string name="menu_report_error">Soporte / Errores</string>
+    <string name="menu_database">Gestión de Situación y Datos</string>
+    <string name="menu_backup">Copia de Seguridad</string>
+    <string name="menu_settings">Ajustes Globales</string>
+
+    <!-- Vocabulario Neutro (Base / España) -->
+    <string name="title_cycles">Ciclos de Pago</string>
+    <string name="input_monthly_income">Introducir Sueldo Neto</string>
+    <string name="register_expense">Registrar Gasto</string>
+    <string name="available_cycle_balance">Balance Disponible del Ciclo</string>
+    <string name="category_fixed_expenses">Categoría de Gastos Fijos</string>
+
+    <!-- Estado y mensajes de saldo disponible real -->
+    <string name="status_danger">📌 Balance en riesgo: Su saldo bancario actual es inferior al total de las facturas obligatorias pendientes. Este dinero ya está comprometido. Se recomienda pausar los gastos variables de inmediato.</string>
+    <string name="status_warning">⚠️ Margen limitado: Sus facturas próximas están cubiertas, pero el saldo restante es mínimo. Evite gastos no esenciales para prevenir descubiertos bancarios.</string>
+    <string name="status_safe">✅ Fondo disponible real: Sus próximos recibos obligatorios ya han sido reservados y protegidos. Este es el importe exacto que tiene libre para gastar o ahorrar.</string>
+
+    <!-- Ajustes Globales (v1.6.0) -->
+    <string name="settings_title">Ajustes Globales</string>
+    <string name="settings_sec_profile">👤 Perfil e Ingresos</string>
+    <string name="settings_sec_appearance">🎨 Apariencia y UI</string>
+    <string name="settings_sec_services">⚡ Servicios y Gastos del Wizard</string>
+    <string name="settings_sec_security">🔒 Seguridad, Alertas y Rendimiento</string>
+    <string name="setting_biometric_title">Seguridad Biométrica</string>
+    <string name="setting_biometric_desc">Requerir huella dactilar, desbloqueo facial o PIN al iniciar</string>
+    <string name="setting_notifications_title">Alertas y Recordatorios de Pago</string>
+    <string name="setting_notifications_desc">Notificar vencimientos de facturas fijas 48 horas antes</string>
+    <string name="setting_cycle_title">Cierre de Ciclo Personalizado</string>
+    <string name="setting_cycle_desc">Ajusta el rango del ciclo contable (Días 1 a 31)</string>
+    <string name="setting_performance_title">Modo de Alto Rendimiento</string>
+    <string name="setting_performance_desc">Desactivar transiciones o animaciones pesadas para maximizar fluidez</string>
 </resources>

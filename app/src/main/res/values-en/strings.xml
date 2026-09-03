@@ -6,4 +6,9 @@
     <string name="menu_about">About FinanceFlow</string>
     <string name="menu_report_error">Report Errors 🐞</string>
     <string name="menu_database">Database</string>
+
+    <!-- Real available balance status messages -->
+    <string name="status_danger"> Balance at risk: Your current bank balance is lower than your upcoming mandatory bills. This money is already committed. It is recommended to freeze variable spending immediately.</string>
+    <string name="status_warning">⚠️ Limited margin: Your upcoming bills are covered, but the remaining balance is minimal. Avoid non-essential spending to prevent overdrafts.</string>
+    <string name="status_safe">Real available balance: Your upcoming mandatory bills have been set aside and protected. This is the exact amount you can safely spend or save.</string>
 </resources>

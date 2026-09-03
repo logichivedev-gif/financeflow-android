@@ -1,21 +1,38 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ==============================================================================
+# REGLAS ESPECÍFICAS DE OPTIMIZACIÓN Y OFUSCACIÓN (v1.3.0)
+# ==============================================================================
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Conservar lineas y trazas de error originales para depurar crashes en producción
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ------------------------------------------------------------------------------
+# ARQUITECTURA DE PERSISTENCIA: ROOM DATABASE
+# ------------------------------------------------------------------------------
+# Conservar las anotaciones de Room y evitar el renombrado de clases generadas
+-keepclassmembers class * {
+    @androidx.room.Dao *;
+    @androidx.room.Database *;
+}
+-keep class * implements androidx.room.RoomOpenHelper
+-keep class androidx.room.RoomDatabase { java.util.concurrent.locks.ReentrantReadWriteLock mCloseLock; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# BLINDAJE CRÍTICO: Conservar tus entidades físicas de la base de datos intactas
+# (Previene errores NoSuchMethodException o mapeos de tabla rotos)
+-keep class com.example.data.** { *; }
+
+# ------------------------------------------------------------------------------
+# SERIALIZACIÓN Y BACKUP: MOSHI JSON
+# ------------------------------------------------------------------------------
+# Mantener metadatos obligatorios de firmas y anotaciones para el procesador KSP
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# Evitar que R8 elimine las clases generadas por moshi-kotlin-codegen
+-keep class *JsonAdapter { <init>(...); }
+-keep class * implements com.squareup.moshi.JsonAdapter
+-keep @interface com.squareup.moshi.JsonQualifier
+
+# Conservar nombres de campos serializados para que no muten en el archivo JSON
+-keepclassmembers class * {
+    @com.squareup.moshi.Json *;
+}

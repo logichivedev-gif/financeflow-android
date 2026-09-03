@@ -3,6 +3,42 @@ package com.example.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+enum class BillingFrequency {
+    MENSUAL,
+    BIMENSUAL,
+    TRIMESTRAL,
+    ANUAL;
+
+    override fun toString(): String {
+        return when (this) {
+            MENSUAL -> "Mensual"
+            BIMENSUAL -> "Bimensual"
+            TRIMESTRAL -> "Trimestral"
+            ANUAL -> "Anual"
+        }
+    }
+
+    companion object {
+        fun fromString(value: String): BillingFrequency {
+            return when (value.uppercase()) {
+                "MENSUAL" -> MENSUAL
+                "BIMENSUAL" -> BIMENSUAL
+                "TRIMESTRAL" -> TRIMESTRAL
+                "ANUAL" -> ANUAL
+                else -> {
+                    when (value) {
+                        "Mensual" -> MENSUAL
+                        "Bimensual" -> BIMENSUAL
+                        "Trimestral" -> TRIMESTRAL
+                        "Anual" -> ANUAL
+                        else -> MENSUAL
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Entity(tableName = "financial_profile")
 data class FinancialProfile(
     @PrimaryKey val id: Int = 1,
@@ -27,9 +63,19 @@ data class FinancialProfile(
     val hideNewMonthBanner: Boolean = false,
     val hideSmartCalendarBanner: Boolean = false,
     val selectedTheme: String = "azul",
+    val themeMode: String = "system",
     val selectedIcon: String = "trending",
     val isProUser: Boolean = false,
-    val selectedCurrency: String = "€"
+    val selectedCurrency: String = "€",
+    val isBiometricEnabled: Boolean = false,
+    val isPaymentNotificationsEnabled: Boolean = true,
+    val paymentNotificationHoursLead: Int = 48,
+    val customCycleStartDay: Int = 1,
+    val isHighPerformanceMode: Boolean = false,
+    val userName: String = "Usuario",
+    val avatarId: String = "avatar_1",
+    val customAvatarUri: String = "",
+    val isBankNotificationInterceptorEnabled: Boolean = false
 )
 
 @Entity(tableName = "expense_categories")
@@ -47,8 +93,29 @@ data class ExpenseCategory(
     val isVariableBill: Boolean = false, // If this fixed expense changes details/amount each month (like luz, agua, etc.)
     val assumedByPartner: Boolean = false, // If the partner pays this bill at 100% and it shouldn't subtract from user's budget
     val isFinancing: Boolean = false, // If it is a financing/loan/installment
-    val monthsRemaining: Int? = null // Number of months remaining for financing
-)
+    val monthsRemaining: Int? = null, // Number of months remaining for financing
+    val totalInstallments: Int? = null, // Total de cuotas (ej: 12, 24, 36)
+    val currentInstallment: Int? = null, // Cuota actual (ej: 1, 5, etc.)
+    val financingStartDate: Long? = null, // Fecha de inicio de la financiación (timestamp ms)
+    val isSkippedThisMonth: Boolean = false, // If a bimonthly/quarterly expense is skipped or not due this month
+    val isInsurance: Boolean = false, // If it is an insurance policy (coche, hogar, salud, vida, etc.)
+    val isCashPayment: Boolean = false, // If paid in cash / non-bank payment
+    val isArchived: Boolean = false // If marked as archived for fixed expenses history
+) {
+    val isInsurancePolicy: Boolean
+        get() = isInsurance
+
+    val effectiveTotalInstallments: Int
+        get() = totalInstallments ?: monthsRemaining ?: 1
+
+    val effectiveCurrentInstallment: Int
+        get() {
+            if (currentInstallment != null && currentInstallment > 0) return currentInstallment
+            val total = effectiveTotalInstallments
+            val rem = monthsRemaining ?: total
+            return (total - rem + 1).coerceIn(1, total)
+        }
+}
 
 @Entity(tableName = "variable_expenses")
 data class VariableExpenseEntry(

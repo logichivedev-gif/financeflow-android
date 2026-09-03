@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title_cycles">Ciclos de Planilla</string>
+    <string name="input_monthly_income">Ingresar Pago de Planilla</string>
+    <string name="register_expense">Registrar Compra</string>
+    <string name="available_cycle_balance">Presupuesto Disponible del Ciclo</string>
+    <string name="category_fixed_expenses">Servicios Básicos y Fijos</string>
+    <string name="menu_backup">Copia de Respaldo</string>
+
+    <string name="status_danger">🛑 Saldo en riesgo: Su saldo actual en cuenta es inferior al total de los pagos obligatorios pendientes. Este dinero ya está comprometido. Se recomienda pausar las compras variables de inmediato.</string>
+    <string name="status_warning">⚠️ Margen limitado: Sus próximos pagos están cubiertos, pero el saldo restante es mínimo. Evite gastos no esenciales para prevenir sobregiros bancarios.</string>
+    <string name="status_safe">✅ Presupuesto disponible real: Sus próximos recibos y pagos fijos ya han sido reservados. Este es el monto exacto que tiene libre para gastar o ahorrar.</string>
+</resources>
