@@ -91,31 +91,38 @@ fun sendFeedback(context: android.content.Context) {
 }
 
 /**
- * Calcula y formatea la fecha en que concluye una financiación o préstamo (ej: "Finaliza en Marzo de 2027").
+ * Calcula y formatea la fecha en que concluye una financiación o préstamo (ej: "Finaliza en Noviembre de 2026").
  * Soporta cálculo mediante java.time.YearMonth y java.util.Calendar para máxima compatibilidad.
+ * Regla: La fecha de fin es startDate.plusMonths(totalInstallments - 1)
  */
 fun calculateFinancingEndDate(
     monthsRemaining: Int?,
     totalInstallments: Int? = null,
+    currentInstallment: Int? = null,
     startDateMs: Long? = null,
     isPaid: Boolean = false
 ): String {
-    if (monthsRemaining == null) return ""
-    if (monthsRemaining <= 0) return "Finalizado"
+    if (monthsRemaining == null && totalInstallments == null) return ""
+    if (monthsRemaining != null && monthsRemaining <= 0) return "Finalizado"
 
     val localeEs = Locale.Builder().setLanguage("es").setRegion("ES").build()
 
     return try {
+        val total = if (totalInstallments != null && totalInstallments > 0) totalInstallments else (monthsRemaining ?: 1)
+        val current = (currentInstallment ?: 1).coerceIn(1, maxOf(total, 1))
+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val endYearMonth = if (startDateMs != null && startDateMs > 0) {
                 val instant = java.time.Instant.ofEpochMilli(startDateMs)
                 val startYm = java.time.YearMonth.from(instant.atZone(java.time.ZoneId.systemDefault()))
-                val total = totalInstallments ?: monthsRemaining
+                // Si la cuota 1 se cobra en el mes de inicio, la cuota total concluye en: startYm + (total - 1)
                 startYm.plusMonths((total - 1).coerceAtLeast(0).toLong())
             } else {
                 val currentYm = java.time.YearMonth.now()
-                val offset = if (isPaid) monthsRemaining.toLong() else (monthsRemaining - 1).coerceAtLeast(0).toLong()
-                currentYm.plusMonths(offset)
+                // Si estamos en la cuota activa actual (current) este mes:
+                // la última cuota 'total' se completará en: currentYm + (total - current)
+                val monthsAhead = (total - current).coerceAtLeast(0).toLong()
+                currentYm.plusMonths(monthsAhead)
             }
             val monthName = endYearMonth.month.getDisplayName(java.time.format.TextStyle.FULL, localeEs)
                 .replaceFirstChar { if (it.isLowerCase()) it.titlecase(localeEs) else it.toString() }
@@ -124,11 +131,10 @@ fun calculateFinancingEndDate(
             val cal = java.util.Calendar.getInstance()
             if (startDateMs != null && startDateMs > 0) {
                 cal.timeInMillis = startDateMs
-                val total = totalInstallments ?: monthsRemaining
                 cal.add(java.util.Calendar.MONTH, (total - 1).coerceAtLeast(0))
             } else {
-                val offset = if (isPaid) monthsRemaining else (monthsRemaining - 1).coerceAtLeast(0)
-                cal.add(java.util.Calendar.MONTH, offset)
+                val monthsAhead = (total - current).coerceAtLeast(0)
+                cal.add(java.util.Calendar.MONTH, monthsAhead)
             }
             val monthName = cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, localeEs)
                 ?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(localeEs) else it.toString() } ?: ""
@@ -136,8 +142,9 @@ fun calculateFinancingEndDate(
         }
     } catch (e: Exception) {
         val cal = java.util.Calendar.getInstance()
-        val offset = if (isPaid) monthsRemaining else (monthsRemaining - 1).coerceAtLeast(0)
-        cal.add(java.util.Calendar.MONTH, offset)
+        val total = if (totalInstallments != null && totalInstallments > 0) totalInstallments else (monthsRemaining ?: 1)
+        val current = (currentInstallment ?: 1).coerceIn(1, maxOf(total, 1))
+        cal.add(java.util.Calendar.MONTH, (total - current).coerceAtLeast(0))
         val monthName = cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, localeEs)
             ?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(localeEs) else it.toString() } ?: ""
         "Finaliza en $monthName de ${cal.get(java.util.Calendar.YEAR)}"
@@ -147,11 +154,74 @@ fun calculateFinancingEndDate(
 fun calculateFinancingEndDate(category: com.example.data.ExpenseCategory): String {
     if (!category.isFinancing) return ""
     return calculateFinancingEndDate(
-        monthsRemaining = category.monthsRemaining,
-        totalInstallments = category.totalInstallments,
+        monthsRemaining = category.remainingInstallments,
+        totalInstallments = category.effectiveTotalInstallments,
+        currentInstallment = category.effectiveCurrentInstallment,
         startDateMs = category.financingStartDate,
         isPaid = category.isPaid
     )
+}
+
+fun calculateEstimatedStartDateMs(currentInstallment: Int, payDay: Int? = null): Long {
+    val cal = java.util.Calendar.getInstance()
+    if (payDay != null && payDay in 1..31) {
+        cal.set(java.util.Calendar.DAY_OF_MONTH, payDay.coerceIn(1, 28))
+    }
+    cal.add(java.util.Calendar.MONTH, -(currentInstallment - 1).coerceAtLeast(0))
+    return cal.timeInMillis
+}
+
+data class InstallmentPlanItem(
+    val installmentNumber: Int,
+    val totalInstallments: Int,
+    val dateLabel: String,
+    val amount: Double,
+    val isPaid: Boolean,
+    val isCurrent: Boolean
+)
+
+fun generateInstallmentPlan(category: com.example.data.ExpenseCategory): List<InstallmentPlanItem> {
+    val total = category.effectiveTotalInstallments
+    val current = category.effectiveCurrentInstallment
+    val localeEs = Locale.Builder().setLanguage("es").setRegion("ES").build()
+
+    val payDay = category.payDay ?: 1
+    val startCal = java.util.Calendar.getInstance().apply {
+        if (category.financingStartDate != null && category.financingStartDate > 0) {
+            timeInMillis = category.financingStartDate
+        } else {
+            set(java.util.Calendar.DAY_OF_MONTH, payDay.coerceIn(1, 28))
+            add(java.util.Calendar.MONTH, -(current - 1).coerceAtLeast(0))
+        }
+    }
+
+    return (1..total).map { num ->
+        val itemCal = (startCal.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.MONTH, num - 1)
+        }
+        val dayFormatted = String.format(localeEs, "%02d", itemCal.get(java.util.Calendar.DAY_OF_MONTH))
+        val monthName = itemCal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, localeEs)
+            ?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(localeEs) else it.toString() } ?: ""
+        val year = itemCal.get(java.util.Calendar.YEAR)
+        val dateLabel = "$dayFormatted de $monthName de $year"
+
+        val isItemPaid = if (num < current) {
+            true
+        } else if (num == current) {
+            category.isPaid
+        } else {
+            false
+        }
+
+        InstallmentPlanItem(
+            installmentNumber = num,
+            totalInstallments = total,
+            dateLabel = dateLabel,
+            amount = category.limitAmount,
+            isPaid = isItemPaid,
+            isCurrent = (num == current)
+        )
+    }
 }
 
 

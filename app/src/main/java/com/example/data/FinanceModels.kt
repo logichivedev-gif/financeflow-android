@@ -107,17 +107,47 @@ data class ExpenseCategory(
 
     val effectiveTotalInstallments: Int
         get() {
-            val total = totalInstallments ?: monthsRemaining ?: 1
-            return if (total <= 0) 1 else total
+            if (totalInstallments != null && totalInstallments > 0) return totalInstallments
+            val rem = monthsRemaining ?: 0
+            val curr = currentInstallment ?: 1
+            val paid = if (isPaid) curr else (curr - 1).coerceAtLeast(0)
+            val deduced = paid + rem
+            return if (deduced > 0) deduced else if (rem > 0) rem else 1
+        }
+
+    val paidInstallmentsCount: Int
+        get() {
+            val total = effectiveTotalInstallments
+            if (monthsRemaining != null) {
+                return (total - monthsRemaining.coerceIn(0, total)).coerceIn(0, total)
+            }
+            val curr = currentInstallment ?: 1
+            return if (isPaid) curr.coerceIn(0, total) else (curr - 1).coerceIn(0, total)
         }
 
     val effectiveCurrentInstallment: Int
         get() {
             val total = effectiveTotalInstallments
             if (total <= 0) return 1
-            if (currentInstallment != null && currentInstallment > 0) return currentInstallment.coerceIn(1, total)
+            if (currentInstallment != null && currentInstallment > 0) {
+                // Si monthsRemaining contradice fuertemente un currentInstallment inicial (ej: quedan 2 de 9)
+                val rem = monthsRemaining
+                if (rem != null && currentInstallment == 1 && total > 2 && rem < total) {
+                    val activeIndex = (total - rem + (if (isPaid) 0 else 1)).coerceIn(1, total)
+                    return activeIndex
+                }
+                return currentInstallment.coerceIn(1, total)
+            }
             val rem = monthsRemaining ?: total
-            return (total - rem + 1).coerceIn(1, total)
+            val activeIndex = (total - rem + (if (isPaid) 0 else 1)).coerceIn(1, total)
+            return activeIndex
+        }
+
+    val remainingInstallments: Int
+        get() {
+            val total = effectiveTotalInstallments
+            val paid = paidInstallmentsCount
+            return (total - paid).coerceAtLeast(0)
         }
 }
 

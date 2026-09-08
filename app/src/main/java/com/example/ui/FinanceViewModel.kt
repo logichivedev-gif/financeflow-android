@@ -590,10 +590,21 @@ class FinanceViewModel(
             val existingFinancing = categories.count { it.isFinancing }
             
             val finalIsFinancing = if (!isPro && existingFinancing >= 2) false else isFinancing
-            val finalMonths = if (finalIsFinancing) monthsRemaining else null
-            val finalTotal = if (finalIsFinancing) (totalInstallments ?: finalMonths) else null
             val finalCurrent = if (finalIsFinancing) (currentInstallment ?: 1) else null
-            val finalStart = if (finalIsFinancing) (financingStartDate ?: System.currentTimeMillis()) else null
+            val finalTotal = if (finalIsFinancing) {
+                totalInstallments ?: if (monthsRemaining != null) {
+                    val paid = ((finalCurrent ?: 1) - 1).coerceAtLeast(0)
+                    paid + monthsRemaining
+                } else 12
+            } else null
+            val finalMonths = if (finalIsFinancing) {
+                monthsRemaining ?: if (finalTotal != null && finalCurrent != null) {
+                    (finalTotal - ((finalCurrent - 1).coerceAtLeast(0))).coerceAtLeast(0)
+                } else null
+            } else null
+            val finalStart = if (finalIsFinancing) {
+                financingStartDate ?: com.example.ui.common.calculateEstimatedStartDateMs(finalCurrent ?: 1, payDay)
+            } else null
             val detectedInsurance = isInsurance || name.contains("seguro", ignoreCase = true) || name.contains("póliza", ignoreCase = true) || name.contains("poliza", ignoreCase = true) || name.contains("sanitas", ignoreCase = true) || name.contains("axa", ignoreCase = true) || name.contains("mapfre", ignoreCase = true) || name.contains("mutua", ignoreCase = true)
 
             val monthlyLimit = when (com.example.data.BillingFrequency.fromString(billingCycle)) {
@@ -650,10 +661,22 @@ class FinanceViewModel(
             val existingFinancing = categories.count { it.isFinancing }
             
             val finalIsFinancing = if (!isPro && existingFinancing >= 2) false else isFinancing
-            val finalMonths = if (finalIsFinancing) monthsRemaining else null
-            val finalTotal = if (finalIsFinancing) (totalInstallments ?: existed.totalInstallments ?: finalMonths) else null
             val finalCurrent = if (finalIsFinancing) (currentInstallment ?: existed.currentInstallment ?: 1) else null
-            val finalStart = if (finalIsFinancing) (financingStartDate ?: existed.financingStartDate ?: System.currentTimeMillis()) else null
+            val finalTotal = if (finalIsFinancing) {
+                totalInstallments ?: existed.totalInstallments ?: if (monthsRemaining != null) {
+                    val paid = if (existed.isPaid) (finalCurrent ?: 1) else ((finalCurrent ?: 1) - 1).coerceAtLeast(0)
+                    paid + monthsRemaining
+                } else 12
+            } else null
+            val finalMonths = if (finalIsFinancing) {
+                monthsRemaining ?: if (finalTotal != null && finalCurrent != null) {
+                    val paid = if (existed.isPaid) finalCurrent else (finalCurrent - 1).coerceAtLeast(0)
+                    (finalTotal - paid).coerceAtLeast(0)
+                } else null
+            } else null
+            val finalStart = if (finalIsFinancing) {
+                financingStartDate ?: existed.financingStartDate ?: com.example.ui.common.calculateEstimatedStartDateMs(finalCurrent ?: 1, payDay)
+            } else null
             val detectedInsurance = isInsurance || name.contains("seguro", ignoreCase = true) || name.contains("póliza", ignoreCase = true) || name.contains("poliza", ignoreCase = true) || name.contains("sanitas", ignoreCase = true) || name.contains("axa", ignoreCase = true) || name.contains("mapfre", ignoreCase = true) || name.contains("mutua", ignoreCase = true)
 
             val monthlyLimit = when (com.example.data.BillingFrequency.fromString(billingCycle)) {
@@ -744,17 +767,26 @@ class FinanceViewModel(
                         // Excess financing for free users - disable to prevent ghost subtractions
                         base.copy(isAdded = false)
                     } else {
-                        val rem = category.monthsRemaining
-                        if (rem != null) {
-                            val nextRem = rem - 1
-                            val nextCurrent = (category.currentInstallment ?: category.effectiveCurrentInstallment) + 1
-                            if (nextRem <= 0) {
-                                base.copy(isAdded = false, monthsRemaining = 0, isArchived = true, currentInstallment = category.effectiveTotalInstallments)
-                            } else {
-                                base.copy(monthsRemaining = nextRem, currentInstallment = nextCurrent)
-                            }
+                        val total = category.effectiveTotalInstallments
+                        val curr = category.effectiveCurrentInstallment
+                        val rem = category.remainingInstallments
+                        // Si ya fue pagada el mes anterior, 'rem' ya fue decrementado al pagar
+                        val nextRem = if (category.isPaid) rem else (rem - 1).coerceAtLeast(0)
+                        val nextCurrent = if (category.isPaid) curr else (curr + 1).coerceAtMost(total)
+                        if (nextRem <= 0) {
+                            base.copy(
+                                isAdded = false,
+                                monthsRemaining = 0,
+                                isArchived = true,
+                                totalInstallments = total,
+                                currentInstallment = total
+                            )
                         } else {
-                            base
+                            base.copy(
+                                monthsRemaining = nextRem,
+                                currentInstallment = nextCurrent,
+                                totalInstallments = total
+                            )
                         }
                     }
                 } else {
@@ -1344,9 +1376,12 @@ class FinanceViewModel(
     fun payFinancingInstallment(id: String): kotlinx.coroutines.Job = viewModelScope.launch {
         val categories = repository.getAllCategoriesDirect()
         val cat = categories.find { it.id == id } ?: return@launch
-        if (cat.isFinancing && cat.monthsRemaining != null) {
-            val nextRem = cat.monthsRemaining - 1
-            val nextCurrent = (cat.currentInstallment ?: cat.effectiveCurrentInstallment) + 1
+        if (cat.isFinancing) {
+            val total = cat.effectiveTotalInstallments
+            val curr = cat.effectiveCurrentInstallment
+            val currentRem = cat.remainingInstallments
+            val nextRem = (currentRem - 1).coerceAtLeast(0)
+            val nextCurrent = if (curr < total) curr + 1 else total
             if (nextRem <= 0) {
                 repository.saveCategory(
                     cat.copy(
@@ -1354,7 +1389,8 @@ class FinanceViewModel(
                         isPaid = true,
                         isAdded = false,
                         isArchived = true,
-                        currentInstallment = cat.effectiveTotalInstallments
+                        totalInstallments = total,
+                        currentInstallment = total
                     )
                 )
             } else {
@@ -1362,6 +1398,7 @@ class FinanceViewModel(
                     cat.copy(
                         monthsRemaining = nextRem,
                         isPaid = true,
+                        totalInstallments = total,
                         currentInstallment = nextCurrent
                     )
                 )

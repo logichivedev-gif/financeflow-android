@@ -7,9 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,6 +53,7 @@ fun FixedBillsPane(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
+    var viewingPlanCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("TODOS") } // "TODOS", "PENDIENTES", "PAGADOS", "FINANCIACIONES"
 
@@ -250,7 +253,8 @@ fun FixedBillsPane(
                         onToggleSkipped = { viewModel.toggleCategorySkippedThisMonth(item.id, !item.isSkippedThisMonth) },
                         onPayInstallment = { viewModel.payFinancingInstallment(item.id) },
                         onEdit = { editingCategory = item },
-                        onDelete = { viewModel.deleteFixedBillCategory(item.id) }
+                        onDelete = { viewModel.deleteFixedBillCategory(item.id) },
+                        onViewPlan = { viewingPlanCategory = item }
                     )
                 }
             }
@@ -305,6 +309,15 @@ fun FixedBillsPane(
             }
         )
     }
+
+    // Dialog: Payment Plan
+    viewingPlanCategory?.let { category ->
+        PaymentPlanDialog(
+            category = category,
+            currencySymbol = currencySymbol,
+            onDismiss = { viewingPlanCategory = null }
+        )
+    }
 }
 
 @Composable
@@ -317,7 +330,8 @@ fun FixedBillCard(
     onToggleSkipped: () -> Unit,
     onPayInstallment: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onViewPlan: () -> Unit = {}
 ) {
     var expandedOptions by remember { mutableStateOf(false) }
 
@@ -396,11 +410,11 @@ fun FixedBillCard(
                         }
 
                         if (category.isFinancing) {
-                            val rem = category.monthsRemaining ?: 0
+                            val rem = category.remainingInstallments
                             val total = category.effectiveTotalInstallments
                             val current = category.effectiveCurrentInstallment
                             Text(
-                                text = "Cuota $current/$total",
+                                text = "Cuota $current/$total ($rem restantes)",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF7C3AED),
                                 fontWeight = FontWeight.Bold
@@ -517,15 +531,19 @@ fun FixedBillCard(
                         }
                     }
 
-                    if (category.isFinancing && (category.monthsRemaining ?: 0) > 0) {
+                    if (category.isFinancing && category.remainingInstallments > 0) {
                         val total = category.effectiveTotalInstallments
                         val current = category.effectiveCurrentInstallment
-                        val progress = (current.toFloat() / maxOf(total, 1).toFloat()).coerceIn(0f, 1f)
+                        val rem = category.remainingInstallments
+                        val paidCount = category.paidInstallmentsCount
+                        val progress = (paidCount.toFloat() / maxOf(total, 1).toFloat()).coerceIn(0f, 1f)
                         
                         Surface(
                             color = Color(0xFF7C3AED).copy(alpha = 0.07f),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onViewPlan() }
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -537,7 +555,7 @@ fun FixedBillCard(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Cuota $current de $total (${category.monthsRemaining} restantes)",
+                                        text = "Cuota $current de $total ($rem restantes)",
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = Color(0xFF7C3AED)
                                     )
@@ -556,6 +574,17 @@ fun FixedBillCard(
                                     color = Color(0xFF7C3AED),
                                     trackColor = Color(0xFF7C3AED).copy(alpha = 0.20f)
                                 )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Text(
+                                        text = "Ver Plan de Pago ($total cuotas) ➔",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = Color(0xFF7C3AED),
+                                        fontSize = 10.sp
+                                    )
+                                }
                             }
                         }
 
@@ -567,7 +596,7 @@ fun FixedBillCard(
                         ) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Avanzar 1 Mes Pagado (${category.monthsRemaining} restantes)", fontSize = 12.sp)
+                            Text("Avanzar 1 Mes Pagado ($rem restantes)", fontSize = 12.sp)
                         }
                     }
 
@@ -629,7 +658,16 @@ fun AddEditFixedBillDialog(
     var billingCycle by remember { mutableStateOf(category?.billingCycle ?: "Mensual") }
     var payDayText by remember { mutableStateOf(category?.payDay?.toString() ?: "") }
     var isFinancing by remember { mutableStateOf(category?.isFinancing ?: false) }
-    var totalMonthsText by remember { mutableStateOf((category?.totalInstallments ?: category?.monthsRemaining ?: 12).toString()) }
+    val initialTotal = when {
+        category?.totalInstallments != null && category.totalInstallments > 0 -> category.totalInstallments
+        category?.monthsRemaining != null && category.monthsRemaining > 0 -> {
+            val curr = category.currentInstallment ?: 1
+            val paid = if (category.isPaid) curr else (curr - 1).coerceAtLeast(0)
+            paid + category.monthsRemaining
+        }
+        else -> 12
+    }
+    var totalMonthsText by remember { mutableStateOf(initialTotal.toString()) }
     var currentInstallmentText by remember { mutableStateOf((category?.effectiveCurrentInstallment ?: 1).toString()) }
     var isCash by remember { mutableStateOf(category?.isCashPayment ?: false) }
 
@@ -794,14 +832,17 @@ fun AddEditFixedBillDialog(
                             )
                         }
 
-                        val parsedTotal = totalMonthsText.toIntOrNull() ?: 1
-                        val parsedCurrent = (currentInstallmentText.toIntOrNull() ?: 1).coerceIn(1, maxOf(parsedTotal, 1))
-                        val calculatedRemaining = (parsedTotal - parsedCurrent + 1).coerceAtLeast(0)
+                        val parsedTotal = (totalMonthsText.toIntOrNull() ?: 1).coerceAtLeast(1)
+                        val parsedCurrent = (currentInstallmentText.toIntOrNull() ?: 1).coerceIn(1, parsedTotal)
+                        val paidCount = if (category?.isPaid == true) parsedCurrent else (parsedCurrent - 1).coerceAtLeast(0)
+                        val calculatedRemaining = (parsedTotal - paidCount).coerceAtLeast(0)
+                        val calculatedStartMs = category?.financingStartDate ?: calculateEstimatedStartDateMs(parsedCurrent, payDayText.toIntOrNull())
                         val previewDate = calculateFinancingEndDate(
                             monthsRemaining = calculatedRemaining,
                             totalInstallments = parsedTotal,
-                            startDateMs = category?.financingStartDate ?: System.currentTimeMillis(),
-                            isPaid = false
+                            currentInstallment = parsedCurrent,
+                            startDateMs = calculatedStartMs,
+                            isPaid = category?.isPaid ?: false
                         )
 
                         Surface(
@@ -822,7 +863,7 @@ fun AddEditFixedBillDialog(
                                 )
                                 Column {
                                     Text(
-                                        text = "Previsión de finalización ($calculatedRemaining meses restantes):",
+                                        text = "Previsión: $paidCount pagadas • $calculatedRemaining restantes",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color(0xFF7C3AED)
                                     )
@@ -856,10 +897,11 @@ fun AddEditFixedBillDialog(
                 onClick = {
                     val amount = amountText.replace(',', '.').toDoubleOrNull() ?: 0.0
                     val payDay = payDayText.toIntOrNull()?.coerceIn(1, 31)
-                    val parsedTotal = totalMonthsText.toIntOrNull() ?: 1
-                    val parsedCurrent = (currentInstallmentText.toIntOrNull() ?: 1).coerceIn(1, maxOf(parsedTotal, 1))
-                    val calculatedRemaining = (parsedTotal - parsedCurrent + 1).coerceAtLeast(0)
-                    val startMs = category?.financingStartDate ?: System.currentTimeMillis()
+                    val parsedTotal = (totalMonthsText.toIntOrNull() ?: 1).coerceAtLeast(1)
+                    val parsedCurrent = (currentInstallmentText.toIntOrNull() ?: 1).coerceIn(1, parsedTotal)
+                    val paidCount = if (category?.isPaid == true) parsedCurrent else (parsedCurrent - 1).coerceAtLeast(0)
+                    val calculatedRemaining = (parsedTotal - paidCount).coerceAtLeast(0)
+                    val calculatedStartMs = category?.financingStartDate ?: calculateEstimatedStartDateMs(parsedCurrent, payDay)
                     if (nameText.isNotBlank() && amount > 0.0) {
                         onSave(
                             nameText.trim(),
@@ -871,7 +913,7 @@ fun AddEditFixedBillDialog(
                             billingCycle,
                             parsedTotal,
                             parsedCurrent,
-                            startMs
+                            calculatedStartMs
                         )
                     }
                 },
@@ -885,6 +927,211 @@ fun AddEditFixedBillDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancelar", color = FinanceSlateLight)
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+@Composable
+fun PaymentPlanDialog(
+    category: ExpenseCategory,
+    currencySymbol: String,
+    onDismiss: () -> Unit
+) {
+    val planItems = remember(category) { generateInstallmentPlan(category) }
+    val total = category.effectiveTotalInstallments
+    val rem = category.remainingInstallments
+    val paid = category.paidInstallmentsCount
+    val totalFinanced = category.limitAmount * total
+    val paidAmount = category.limitAmount * paid
+    val remainingAmount = category.limitAmount * rem
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ReceiptLong,
+                    contentDescription = null,
+                    tint = Color(0xFF7C3AED),
+                    modifier = Modifier.size(24.dp)
+                )
+                Column {
+                    Text(
+                        text = "Plan de Pago: ${category.name}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = FinanceSlateDark
+                    )
+                    Text(
+                        text = "Total $total cuotas • $rem restantes",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF7C3AED),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    color = Color(0xFF7C3AED).copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Total Financiado:", style = MaterialTheme.typography.labelMedium, color = FinanceSlateLight)
+                            Text(totalFinanced.formatCurrency(currencySymbol), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = FinanceSlateDark)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Amortizado ($paid cuotas):", style = MaterialTheme.typography.labelMedium, color = FinanceSlateLight)
+                            Text(paidAmount.formatCurrency(currencySymbol), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFF16A34A))
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Pendiente ($rem cuotas):", style = MaterialTheme.typography.labelMedium, color = FinanceSlateLight)
+                            Text(remainingAmount.formatCurrency(currencySymbol), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFF7C3AED))
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = Color(0xFF7C3AED).copy(alpha = 0.2f))
+                        Text(
+                            text = "🗓️ " + calculateFinancingEndDate(category),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color(0xFF7C3AED)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Desglose Cuota a Cuota ($total cuotas)",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = FinanceSlateDark
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(planItems) { item ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = when {
+                                item.isPaid -> Color(0xFFDCFCE7).copy(alpha = 0.5f)
+                                item.isCurrent -> Color(0xFFF3E8FF)
+                                else -> Color(0xFFF8FAFC)
+                            },
+                            border = BorderStroke(
+                                1.dp,
+                                when {
+                                    item.isPaid -> Color(0xFF22C55E).copy(alpha = 0.3f)
+                                    item.isCurrent -> Color(0xFF7C3AED)
+                                    else -> Color(0xFFE2E8F0)
+                                }
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Cuota ${item.installmentNumber} de ${item.totalInstallments}",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = if (item.isCurrent) Color(0xFF7C3AED) else FinanceSlateDark
+                                    )
+                                    Text(
+                                        text = item.dateLabel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = FinanceSlateLight,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = item.amount.formatCurrency(currencySymbol),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = FinanceSlateDark
+                                    )
+                                    when {
+                                        item.isPaid -> {
+                                            Surface(
+                                                color = Color(0xFF22C55E).copy(alpha = 0.15f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "✓ Pagada",
+                                                    color = Color(0xFF16A34A),
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                        item.isCurrent -> {
+                                            Surface(
+                                                color = Color(0xFF7C3AED).copy(alpha = 0.15f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (category.isPaid) "✓ Pagada" else "● Activa",
+                                                    color = if (category.isPaid) Color(0xFF16A34A) else Color(0xFF7C3AED),
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                        else -> {
+                                            Text(
+                                                text = "Pendiente",
+                                                color = FinanceSlateLight,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = FinanceTeal)
+            ) {
+                Text("Entendido", fontWeight = FontWeight.Bold)
             }
         },
         shape = RoundedCornerShape(16.dp)
