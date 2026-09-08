@@ -106,12 +106,16 @@ data class ExpenseCategory(
         get() = isInsurance
 
     val effectiveTotalInstallments: Int
-        get() = totalInstallments ?: monthsRemaining ?: 1
+        get() {
+            val total = totalInstallments ?: monthsRemaining ?: 1
+            return if (total <= 0) 1 else total
+        }
 
     val effectiveCurrentInstallment: Int
         get() {
-            if (currentInstallment != null && currentInstallment > 0) return currentInstallment
             val total = effectiveTotalInstallments
+            if (total <= 0) return 1
+            if (currentInstallment != null && currentInstallment > 0) return currentInstallment.coerceIn(1, total)
             val rem = monthsRemaining ?: total
             return (total - rem + 1).coerceIn(1, total)
         }

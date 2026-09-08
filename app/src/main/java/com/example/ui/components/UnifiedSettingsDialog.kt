@@ -36,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.BuildConfig
 import com.example.R
 import com.example.data.FinancialProfile
 import com.example.ui.FinanceViewModel
@@ -1162,7 +1163,7 @@ private fun SecurityAndPerformanceTab(
                             color = FinanceSlateDark
                         )
                         Text(
-                            text = "v2.1.0 • Auto-marcado de pagos",
+                            text = "v${BuildConfig.VERSION_NAME} • Interceptor v2 & Google Wallet",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF0284C7)
                         )

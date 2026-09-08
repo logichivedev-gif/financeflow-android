@@ -253,9 +253,36 @@ class FinanceViewModel(
     val gastoVariableHoyInput: StateFlow<String> = _gastoVariableHoyInput.asStateFlow()
 
     fun updateDigitalBalanceInput(input: String) {
-        _digitalBalanceInput.value = input
-        val parsed = input.toDoubleOrNull() ?: 0.0
-        saveBankBalance(parsed)
+        val filtered = input.replace(',', '.').filter { c -> c.isDigit() || c == '.' }
+        _digitalBalanceInput.value = filtered
+        val parsed = filtered.toDoubleOrNull()
+        if (parsed != null && parsed >= 0.0) {
+            viewModelScope.launch {
+                val existed = repository.getProfileDirect()
+                if (existed != null) {
+                    repository.saveFinancialProfile(existed.copy(currentBankBalance = parsed))
+                } else {
+                    repository.saveFinancialProfile(
+                        FinancialProfile(
+                            currentBankBalance = parsed,
+                            isProUser = true
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateBankBalance(newBalance: Double) {
+        saveBankBalance(newBalance)
+    }
+
+    fun updateBankBalance(input: String) {
+        val sanitized = input.replace(',', '.').trim()
+        val parsed = sanitized.toDoubleOrNull()
+        if (parsed != null && parsed >= 0.0) {
+            updateBankBalance(parsed)
+        }
     }
 
     fun updateBankBalanceDashboard(newBalance: Double) {
@@ -299,6 +326,16 @@ class FinanceViewModel(
     val dbProfile: StateFlow<FinancialProfile?> = repository.financialProfile
         .map { profile -> profile?.copy(isProUser = true) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val bankBalance: StateFlow<Double> = dbProfile
+        .map { profile ->
+            if (profile != null && profile.currentBankBalance >= 0.0) {
+                profile.currentBankBalance
+            } else {
+                profile?.let { it.monthlyIncome + it.partnerContribution } ?: 0.0
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val dbCategories: StateFlow<List<ExpenseCategory>> = combine(repository.activeCategories, repository.financialProfile) { categories, profile ->
         categories.filter { !it.isArchived }

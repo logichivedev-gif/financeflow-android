@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -545,9 +546,13 @@ fun SummaryPane(
     }
 
     val updateBalanceCard = @Composable {
+        val currentBankBal by viewModel.bankBalance.collectAsStateWithLifecycle()
         var isEditingBalance by remember { mutableStateOf(false) }
-        var bankBalanceInput by remember(dbProfile?.currentBankBalance) {
-            mutableStateOf(if ((dbProfile?.currentBankBalance ?: 0.0) > 0.0) dbProfile!!.currentBankBalance.toString() else "")
+        var bankBalanceInput by remember(currentBankBal) {
+            mutableStateOf(if (currentBankBal > 0.0) {
+                val s = currentBankBal.toString()
+                if (s.endsWith(".0")) s.substring(0, s.length - 2) else s
+            } else "")
         }
 
         Card(
@@ -570,7 +575,11 @@ fun SummaryPane(
                             color = FinanceSlateDark
                         )
                         Text(
-                            text = "Actualízalo con la app de tu banco cuando quieras.",
+                            text = if (currentBankBal > 0.0) {
+                                "Registrado: ${currentBankBal.formatCurrency()} • Pulsa Modificar para cambiarlo"
+                            } else {
+                                "Actualízalo con la app de tu banco cuando quieras."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = FinanceSlateLight
                         )
@@ -610,7 +619,7 @@ fun SummaryPane(
                         Button(
                             onClick = {
                                 val newBal = bankBalanceInput.toDoubleOrNull() ?: 0.0
-                                viewModel.updateBankBalanceDashboard(newBal)
+                                viewModel.updateBankBalance(newBal)
                                 isEditingBalance = false
                             },
                             shape = RoundedCornerShape(12.dp),
@@ -1883,18 +1892,32 @@ fun AnalysisPane(
                     value = digitalBalanceInput,
                     onValueChange = { viewModel.updateDigitalBalanceInput(it) },
                     label = { Text("Tu saldo en banco (${CurrencySymbol})", fontSize = 11.sp) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("analysis_bank_balance_input")
+                        .onFocusChanged { focusState ->
+                            if (!focusState.isFocused) {
+                                val parsed = digitalBalanceInput.replace(',', '.').toDoubleOrNull()
+                                if (parsed != null && parsed >= 0.0) {
+                                    viewModel.updateBankBalance(parsed)
+                                }
+                            }
+                        },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
+                        keyboardType = KeyboardType.Decimal,
                         imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
+                            val parsed = digitalBalanceInput.replace(',', '.').toDoubleOrNull()
+                            if (parsed != null && parsed >= 0.0) {
+                                viewModel.updateBankBalance(parsed)
+                            }
                             focusManager.clearFocus()
                             keyboardController?.hide()
                             coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Saldo actualizado correctamente")
+                                snackbarHostState.showSnackbar("Saldo en banco actualizado y sincronizado")
                             }
                         }
                     ),
