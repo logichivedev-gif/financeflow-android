@@ -1,6 +1,8 @@
 package com.example.ui
 
 import android.content.Context
+import android.net.Uri
+import android.os.Environment
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -8,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -93,10 +96,32 @@ class FinanceViewModel(
     }
 
     fun hasLatestDailyBackup(context: Context): Boolean {
+        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val autoBackupFile = File(docsDir, "FinanceFlow/backup_previous_24h.json")
+        val internalJson = File(context.filesDir, "backup_previous_24h.json")
+        if ((autoBackupFile.exists() && autoBackupFile.length() > 0L) ||
+            (internalJson.exists() && internalJson.length() > 0L)
+        ) {
+            return true
+        }
         return backupManager.hasLatestDailyBackup(context)
     }
 
     suspend fun restoreLatestDailyBackup(context: Context): Boolean {
+        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val autoBackupFile = File(docsDir, "FinanceFlow/backup_previous_24h.json")
+        val internalJson = File(context.filesDir, "backup_previous_24h.json")
+
+        val targetJson = when {
+            autoBackupFile.exists() && autoBackupFile.length() > 0L -> autoBackupFile.readText()
+            internalJson.exists() && internalJson.length() > 0L -> internalJson.readText()
+            else -> null
+        }
+
+        if (targetJson != null) {
+            return importDataJson(targetJson)
+        }
+
         val success = backupManager.restoreLatestBackup(context)
         if (success) {
             val profile = repository.getProfileDirect()
@@ -108,6 +133,109 @@ class FinanceViewModel(
             _currentScreen.value = Screen.Dashboard
         }
         return success
+    }
+
+    fun exportBackupToUri(context: Context, uri: Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonString = exportDataJson(context)
+                if (jsonString.isEmpty()) {
+                    withContext(Dispatchers.Main) { onResult(false) }
+                    return@launch
+                }
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(jsonString.toByteArray(Charsets.UTF_8))
+                    outputStream.flush()
+                }
+                withContext(Dispatchers.Main) { onResult(true) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false) }
+            }
+        }
+    }
+
+    fun importBackupFromUri(context: Context, uri: Uri, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonContent = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    inputStream.bufferedReader(Charsets.UTF_8).readText()
+                } ?: ""
+                if (jsonContent.isBlank()) {
+                    withContext(Dispatchers.Main) { onResult(false) }
+                    return@launch
+                }
+                val success = importDataJson(jsonContent)
+                withContext(Dispatchers.Main) { onResult(success) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false) }
+            }
+        }
+    }
+
+    fun triggerAutoBackupExternal(context: Context, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+                val appFolder = File(docsDir, "FinanceFlow").apply { if (!exists()) mkdirs() }
+                val autoBackupFile = File(appFolder, "backup_previous_24h.json")
+
+                val jsonString = exportDataJson(context)
+                if (jsonString.isNotEmpty()) {
+                    autoBackupFile.writeText(jsonString)
+                    try {
+                        val internalBackup = File(context.filesDir, "backup_previous_24h.json")
+                        internalBackup.writeText(jsonString)
+                    } catch (_: Exception) {}
+                    withContext(Dispatchers.Main) { onResult(true) }
+                } else {
+                    withContext(Dispatchers.Main) { onResult(false) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false) }
+            }
+        }
+    }
+
+    fun restoreAutoBackupExternal(context: Context, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+                val autoBackupFile = File(docsDir, "FinanceFlow/backup_previous_24h.json")
+                val internalBackup = File(context.filesDir, "backup_previous_24h.json")
+
+                val targetFile = when {
+                    autoBackupFile.exists() && autoBackupFile.length() > 0L -> autoBackupFile
+                    internalBackup.exists() && internalBackup.length() > 0L -> internalBackup
+                    else -> null
+                }
+
+                if (targetFile != null) {
+                    val jsonContent = targetFile.readText()
+                    val success = importDataJson(jsonContent)
+                    withContext(Dispatchers.Main) { onResult(success) }
+                } else if (backupManager.hasLatestDailyBackup(context)) {
+                    val success = backupManager.restoreLatestBackup(context)
+                    if (success) {
+                        val profile = repository.getProfileDirect()
+                        if (profile != null && !profile.isWizardComplete) {
+                            val updatedProfile = profile.copy(isWizardComplete = true)
+                            repository.saveFinancialProfile(updatedProfile)
+                        }
+                        runSmartAutoCheck()
+                        _currentScreen.value = Screen.Dashboard
+                    }
+                    withContext(Dispatchers.Main) { onResult(success) }
+                } else {
+                    withContext(Dispatchers.Main) { onResult(false) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false) }
+            }
+        }
     }
 
 
@@ -327,9 +455,10 @@ class FinanceViewModel(
         .map { profile -> profile?.copy(isProUser = true) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    // 1. Saldo bancario base con validación correcta de flag (-1.0 es sin configurar)
     val bankBalance: StateFlow<Double> = dbProfile
         .map { profile ->
-            if (profile != null && profile.currentBankBalance >= 0.0) {
+            if (profile != null && profile.currentBankBalance != -1.0 && profile.currentBankBalance >= 0.0) {
                 profile.currentBankBalance
             } else {
                 profile?.let { it.monthlyIncome + it.partnerContribution } ?: 0.0
@@ -355,11 +484,105 @@ class FinanceViewModel(
         .map { expenses -> expenses.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    fun shouldRetainUnpaidFixedExpense(payDay: Int?, incomeDay: Int): Boolean {
-        return true
+    private var referenceCalendarForTesting: java.util.Calendar? = null
+
+    fun setReferenceCalendarForTesting(calendar: java.util.Calendar?) {
+        referenceCalendarForTesting = calendar
+    }
+
+    fun getCurrentCalendar(): java.util.Calendar {
+        return referenceCalendarForTesting?.clone() as? java.util.Calendar ?: java.util.Calendar.getInstance()
+    }
+
+    fun shouldRetainUnpaidFixedExpense(
+        payDay: Int?,
+        incomeDay: Int,
+        currentDate: java.util.Calendar = getCurrentCalendar()
+    ): Boolean {
+        return isBillInCycleWindow(payDay, incomeDay, currentDate)
+    }
+
+    fun calculateSaldoLibreReal(
+        currentBank: Double,
+        profile: FinancialProfile,
+        categories: List<ExpenseCategory>,
+        currentDate: java.util.Calendar = getCurrentCalendar()
+    ): Double {
+        val pendingCategories = categories.filter { category ->
+            !category.isArchived && 
+            (category.isFixed || category.isFinancing) && 
+            !category.assumedByPartner && 
+            !category.isPaid && 
+            !category.isSkippedThisMonth &&
+            shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay, currentDate)
+        }
+
+        val pendingFixed = pendingCategories.sumOf { category ->
+            if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
+        }
+
+        val baseMoney = if (profile.currentBankBalance != -1.0 && profile.currentBankBalance >= 0.0) {
+            currentBank
+        } else {
+            profile.monthlyIncome + profile.partnerContribution
+        }
+
+        return baseMoney - pendingFixed
     }
 
     companion object {
+        fun isBillInCycleWindow(
+            payDay: Int?,
+            incomeDay: Int,
+            currentDate: java.util.Calendar = java.util.Calendar.getInstance()
+        ): Boolean {
+            if (payDay == null || payDay <= 0) return true
+            val validIncomeDay = if (incomeDay in 1..31) incomeDay else 1
+
+            val todayCal = (currentDate.clone() as java.util.Calendar).apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val todayDay = todayCal.get(java.util.Calendar.DAY_OF_MONTH)
+
+            val nextIncomeCal = (todayCal.clone() as java.util.Calendar).apply {
+                if (todayDay >= validIncomeDay) {
+                    add(java.util.Calendar.MONTH, 1)
+                }
+                val maxDays = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                set(java.util.Calendar.DAY_OF_MONTH, minOf(validIncomeDay, maxDays))
+            }
+
+            val cycleEndCal = (nextIncomeCal.clone() as java.util.Calendar).apply {
+                add(java.util.Calendar.DAY_OF_MONTH, -1)
+            }
+
+            // Bill occurrence in the month of todayCal
+            val billCalCurrent = (todayCal.clone() as java.util.Calendar).apply {
+                val maxDays = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                set(java.util.Calendar.DAY_OF_MONTH, minOf(payDay, maxDays))
+            }
+            if (!billCalCurrent.before(todayCal) && !billCalCurrent.after(cycleEndCal)) {
+                return true
+            }
+
+            // Bill occurrence in the month of cycleEndCal (if different month)
+            if (cycleEndCal.get(java.util.Calendar.MONTH) != todayCal.get(java.util.Calendar.MONTH) ||
+                cycleEndCal.get(java.util.Calendar.YEAR) != todayCal.get(java.util.Calendar.YEAR)
+            ) {
+                val billCalNext = (cycleEndCal.clone() as java.util.Calendar).apply {
+                    val maxDays = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                    set(java.util.Calendar.DAY_OF_MONTH, minOf(payDay, maxDays))
+                }
+                if (!billCalNext.before(todayCal) && !billCalNext.after(cycleEndCal)) {
+                    return true
+                }
+            }
+
+            return false
+        }
         fun isBillScheduledDateInPastOrToday(payDay: Int, incomeDay: Int): Boolean {
             val today = java.util.Calendar.getInstance()
             val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
@@ -455,41 +678,31 @@ class FinanceViewModel(
         return Triple(elapsedDays, remainingDays, totalDays)
     }
 
-    val saldoRestanteDisponible: StateFlow<Double> = combine(dbProfile, dbCategories, totalGastosVariables) { profile, categories, variable ->
-        if (profile == null) 0.0
-        else {
-            val baseIncome = profile.monthlyIncome + profile.partnerContribution
-            val isCustomBankBalance = profile.currentBankBalance >= 0.0
-            val baseValue = if (isCustomBankBalance) profile.currentBankBalance else baseIncome
-            
-            val pendingCategories = categories.filter { category ->
-                !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isPaid && !category.isSkippedThisMonth &&
-                shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay)
-            }
-
-            val pendingFixed = pendingCategories.sumOf { category ->
-                if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
-            }
-            
-            Log.d("FinanceDebug", "=== DEPURACION SALDO DISPONIBLE ===")
-            Log.d("FinanceDebug", "currentBankBalance=${profile.currentBankBalance}, baseIncome=$baseIncome, baseValue=$baseValue")
-            Log.d("FinanceDebug", "Total categorias recibidas: ${categories.size}")
-            pendingCategories.forEach { item ->
-                val calculatedAmount = if (item.rawAmount > 0.0 && item.billingCycle != "Mensual") item.rawAmount else item.limitAmount
-                Log.d("FinanceDebug", " - pendingFixed Item: name=${item.name}, id=${item.id}, amount=$calculatedAmount, isPaid=${item.isPaid}, isCash=${item.isCashPayment}, isSkipped=${item.isSkippedThisMonth}, isFixed=${item.isFixed}, isFinancing=${item.isFinancing}")
-            }
-            Log.d("FinanceDebug", "Suma total pendingFixed descontada: $pendingFixed")
-            Log.d("FinanceDebug", "Saldo Restante Disponible final: ${baseValue - pendingFixed}")
-
-            baseValue - pendingFixed
-        }
+    // 2. Presupuesto Variable Restante Unificado
+    val projectedRemainingVariable: StateFlow<Double> = combine(dbCategories, totalGastosVariables) { categories, totalSpent ->
+        val totalVariableBudget = categories.filter { !it.isArchived && !it.isFixed && it.isAdded }.sumOf { it.limitAmount }
+        maxOf(0.0, totalVariableBudget - totalSpent)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
+    // 3. Saldo Restante Disponible (Fórmula Universal por Ciclo de Ingreso)
+    // Saldo Libre Real = Saldo_Banco_Actual + Ingresos_Garantizados_Ciclo - Gastos_Obligatorios_Ciclo
+    val saldoRestanteDisponible: StateFlow<Double> = combine(
+        bankBalance,
+        dbProfile,
+        dbCategories
+    ) { currentBank, profile, categories ->
+        if (profile == null) return@combine 0.0
+        calculateSaldoLibreReal(currentBank, profile, categories, getCurrentCalendar())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    // 4. Proyección a Fin de Mes Sincronizada
     val monthProjection: StateFlow<MonthProjection?> = combine(
         dbProfile,
         dbCategories,
-        dbVariableExpenses
-    ) { profile, categories, variableExpenses ->
+        dbVariableExpenses,
+        bankBalance,
+        projectedRemainingVariable
+    ) { profile, categories, variableExpenses, currentBank, remainingVariable ->
         if (profile == null) return@combine null
 
         val baseIncome = profile.monthlyIncome + profile.partnerContribution
@@ -498,29 +711,18 @@ class FinanceViewModel(
 
         val cycleDays = getFinancialCycleDays(profile.incomeDay)
         val elapsedDays = cycleDays.first
-        val remainingDays = cycleDays.second
-        val totalDaysInMonth = cycleDays.third
-
-        // We still calculate averageDailyVariable for statistical/display purposes
         val averageDailyVariable = if (elapsedDays > 0) totalVariable / elapsedDays else 0.0
 
-        // Use the configured variable budget limit minus spent so far to project remaining expenses safely
-        val totalVariableBudget = categories.filter { !it.isArchived && !it.isFixed && it.isAdded }.sumOf { it.limitAmount }
-        val projectedRemainingVariable = maxOf(0.0, totalVariableBudget - totalVariable)
-        val projectedVariable = totalVariable + projectedRemainingVariable
-        
-        val isCustomBankBalance = profile.currentBankBalance >= 0.0
-        // Exact same calculation logic for pending fixed expenses (Single Source of Truth)
+        val projectedVariable = totalVariable + remainingVariable
+
         val pendingFixed = categories.filter { category ->
             !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isSkippedThisMonth && !category.isPaid &&
-                shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay)
+            shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay, getCurrentCalendar())
         }.sumOf { category ->
             if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
         }
 
-        val bankBalance = if (isCustomBankBalance) profile.currentBankBalance else baseIncome
-        val projectedMonthEndBalance = bankBalance - pendingFixed - projectedRemainingVariable
-
+        val projectedMonthEndBalance = currentBank - pendingFixed - remainingVariable
         val projectedMonthEndSpent = projectedVariable + totalFixed
 
         MonthProjection(

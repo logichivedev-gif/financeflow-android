@@ -35,7 +35,8 @@ class FinanceBalanceWidgetProvider : AppWidgetProvider() {
                 val incomeDay = profile?.incomeDay ?: 1
 
                 val pendingFixed = categories.filter { category ->
-                    !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isPaid && !category.isSkippedThisMonth
+                    !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isPaid && !category.isSkippedThisMonth &&
+                    com.example.ui.FinanceViewModel.isBillInCycleWindow(category.payDay, incomeDay)
                 }.sumOf { it.limitAmount }
 
                 val saldoRestante = baseValue - pendingFixed

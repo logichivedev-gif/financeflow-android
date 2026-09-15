@@ -40,6 +40,7 @@ import com.example.BuildConfig
 import com.example.R
 import com.example.data.FinancialProfile
 import com.example.ui.FinanceViewModel
+import com.example.ui.screens.settings.BackupAndRestoreSection
 import kotlinx.coroutines.launch
 
 private val FinanceTeal = Color(0xFF0061A4)
@@ -1500,110 +1501,16 @@ private fun SecurityAndPerformanceTab(
             }
         }
 
-        // 💾 5. Copia de Seguridad Diaria (24h) y Restauración
-        var showConfirmRestoreDialog by remember { mutableStateOf(false) }
-        val coroutineScope = rememberCoroutineScope()
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.CloudSync, contentDescription = null, tint = Color(0xFF0284C7))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Copia de Seguridad Automática (24h)",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = FinanceSlateDark,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Text(
-                    text = "El sistema genera automáticamente un respaldo local rotativo cada 24 horas (backup_previous.db) para proteger tus finanzas en caso de fallo crítico.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = FinanceSlateLight
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            coroutineScope.launch {
-                                try {
-                                    val workRequest = androidx.work.OneTimeWorkRequestBuilder<com.example.data.DailyBackupWorker>().build()
-                                    androidx.work.WorkManager.getInstance(context).enqueue(workRequest)
-                                    Toast.makeText(context, "💾 Creando copia de seguridad inmediata...", Toast.LENGTH_SHORT).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Forzar Backup", fontSize = 11.sp, maxLines = 1)
-                    }
-
-                    Button(
-                        onClick = {
-                            if (viewModel.hasLatestDailyBackup(context)) {
-                                showConfirmRestoreDialog = true
-                            } else {
-                                Toast.makeText(context, "Aún no existe una copia de seguridad previa de 24h.", Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Restaurar Previo", fontSize = 11.sp, maxLines = 1)
-                    }
-                }
-            }
-        }
-
-        if (showConfirmRestoreDialog) {
-            AlertDialog(
-                onDismissRequest = { showConfirmRestoreDialog = false },
-                title = { Text("¿Restaurar copia previa?") },
-                text = {
-                    Text("Esta acción restaurará la base de datos a partir de backup_previous.db (el estado del día anterior). Los cambios no guardados se sustituirán.")
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showConfirmRestoreDialog = false
-                            coroutineScope.launch {
-                                val success = viewModel.restoreLatestDailyBackup(context)
-                                if (success) {
-                                    Toast.makeText(context, "✅ Base de datos restaurada correctamente", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "❌ Error al restaurar la copia de seguridad", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
-                    ) {
-                        Text("Confirmar Restauración")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showConfirmRestoreDialog = false }) {
-                        Text("Cancelar")
-                    }
-                }
+        // 💾 5. Copia de Seguridad Manual (.fflow) y Automática (24h)
+        val backupSnackbarHostState = remember { SnackbarHostState() }
+        Box(modifier = Modifier.fillMaxWidth()) {
+            BackupAndRestoreSection(
+                viewModel = viewModel,
+                snackbarHostState = backupSnackbarHostState
+            )
+            SnackbarHost(
+                hostState = backupSnackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }

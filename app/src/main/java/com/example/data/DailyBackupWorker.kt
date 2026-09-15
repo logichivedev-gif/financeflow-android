@@ -58,7 +58,27 @@ class DailyBackupWorker(
             // Copia directa y atómica sobrescribiendo el archivo del día anterior
             dbFile.copyTo(backupFile, overwrite = true)
 
-            // 4. Registrar timestamp del último backup
+            // 4. Generar backup JSON rotativo permanente en /Documents/FinanceFlow/backup_previous_24h.json
+            try {
+                val db = FinanceDatabase.getDatabase(context)
+                val repository = FinanceRepository(db.financeDao())
+                val backupManager = BackupManager(repository, db)
+                val jsonString = backupManager.exportBackup(context)
+                if (jsonString.isNotEmpty()) {
+                    val docsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS)
+                    val appFolder = File(docsDir, "FinanceFlow").apply { if (!exists()) mkdirs() }
+                    val externalBackupFile = File(appFolder, "backup_previous_24h.json")
+                    externalBackupFile.writeText(jsonString)
+
+                    val internalJsonFile = File(context.filesDir, "backup_previous_24h.json")
+                    internalJsonFile.writeText(jsonString)
+                    Log.i(TAG, "✅ Backup JSON 24h guardado en ${externalBackupFile.absolutePath}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "No se pudo escribir backup externo en Documents/FinanceFlow: ${e.message}")
+            }
+
+            // 5. Registrar timestamp del último backup
             context.getSharedPreferences("backup_prefs", Context.MODE_PRIVATE)
                 .edit()
                 .putLong("last_daily_backup_time", System.currentTimeMillis())
