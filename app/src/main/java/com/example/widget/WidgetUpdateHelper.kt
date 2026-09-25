@@ -14,7 +14,7 @@ object WidgetUpdateHelper {
     fun updateAllWidgets(context: Context) {
         val appContext = context.applicationContext
 
-        // Update Balance Widget
+        
         val balanceIntent = Intent(appContext, FinanceBalanceWidgetProvider::class.java).apply {
             action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
             val ids = AppWidgetManager.getInstance(appContext).getAppWidgetIds(
@@ -24,7 +24,7 @@ object WidgetUpdateHelper {
         }
         appContext.sendBroadcast(balanceIntent)
 
-        // Update Transactions Widget
+        
         val transactionsIntent = Intent(appContext, FinanceTransactionsWidgetProvider::class.java).apply {
             action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
             val ids = AppWidgetManager.getInstance(appContext).getAppWidgetIds(
@@ -34,7 +34,7 @@ object WidgetUpdateHelper {
         }
         appContext.sendBroadcast(transactionsIntent)
 
-        // Update Actions Widget
+        
         val actionsIntent = Intent(appContext, FinanceActionsWidgetProvider::class.java).apply {
             action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
             val ids = AppWidgetManager.getInstance(appContext).getAppWidgetIds(

@@ -115,12 +115,12 @@ fun calculateFinancingEndDate(
             val endYearMonth = if (startDateMs != null && startDateMs > 0) {
                 val instant = java.time.Instant.ofEpochMilli(startDateMs)
                 val startYm = java.time.YearMonth.from(instant.atZone(java.time.ZoneId.systemDefault()))
-                // Si la cuota 1 se cobra en el mes de inicio, la cuota total concluye en: startYm + (total - 1)
+                
                 startYm.plusMonths((total - 1).coerceAtLeast(0).toLong())
             } else {
                 val currentYm = java.time.YearMonth.now()
-                // Si estamos en la cuota activa actual (current) este mes:
-                // la última cuota 'total' se completará en: currentYm + (total - current)
+                
+                
                 val monthsAhead = (total - current).coerceAtLeast(0).toLong()
                 currentYm.plusMonths(monthsAhead)
             }

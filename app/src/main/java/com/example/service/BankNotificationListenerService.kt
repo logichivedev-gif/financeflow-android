@@ -51,7 +51,7 @@ class BankNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            // Workaround para reactivar el servicio en capas de personalización (MIUI, OneUI, EMUI, ColorOS)
+            
             try {
                 val pm = context.packageManager
                 pm.setComponentEnabledSetting(
@@ -70,103 +70,103 @@ class BankNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // Lista blanca ampliada de aplicaciones financieras, bancarias y billeteras digitales
+        
         private val ALLOWED_BANK_PACKAGES = setOf(
-            // CaixaBank / Imagin
+            
             "es.caixabank.caixabanknow",
             "es.imagin.app",
             "es.caixabank.pay",
             "es.caixabank.empresas",
             "es.lacaixa.mobile.android.newportal",
-            // BBVA
+            
             "es.bbva.mobileP2P",
             "es.bbva.españa",
             "es.bbva.mobile",
             "es.bbva.netcash",
             "com.bbva.bbvacontigo",
-            // Santander
+            
             "es.bancosantander.apps",
             "es.bancosantander.empresas",
             "com.santander.app",
             "es.gruposantander.santanderpymes",
-            // Banco Sabadell
+            
             "com.bancsabadell.bsapp",
             "com.bancsabadell.bsempresas",
             "com.bancsabadell.wallet",
-            // ING
+            
             "es.ing.direct.app",
             "com.ing.mobile",
-            // Revolut
+            
             "com.revolut.revolut",
-            // N26
+            
             "de.number26.android",
-            // Klarna
+            
             "com.klarna.mosaik",
-            // PayPal
+            
             "com.paypal.android.p2pmobile",
-            // Bizum / Redsys
+            
             "es.redsys.bizum",
-            // Unicaja
+            
             "es.unaja.unicaja",
             "com.unicajabanco.unicaja",
-            // Kutxabank / Cajasur
+            
             "es.kutxabank.android",
             "es.cajasur.android",
-            // Abanca
+            
             "es.abanca.android",
-            // Bankinter
+            
             "es.bankinter.mobile",
             "es.bankinter.wallet",
             "es.bankinter.broker",
-            // Openbank
+            
             "com.openbank.mobile",
-            // Cajamar / Ruralvía
+            
             "es.cajamar.handybank",
             "com.rsi",
             "es.ruralvia.movil",
-            // Ibercaja
+            
             "es.ibercaja.mobile",
             "es.ibercaja.pay",
-            // Laboral Kutxa
+            
             "es.laboralkutxa.mobile",
-            // Waylet (Repsol)
+            
             "es.starmobile.waylet",
-            // Wise
+            
             "com.wise.android",
-            // Trade Republic
+            
             "com.traderepublic.app",
             "com.trade_republic.app",
-            // Scalable Capital
+            
             "com.scalable.capital",
-            // Triodos
+            
             "es.triodos.mobile",
-            // MyAndBank
+            
             "com.myandbank.app",
-            // EVO Banco
+            
             "es.evobanco.bancamovil",
-            // Pibank
+            
             "es.pibank.app",
-            // Deutsche Bank España
+            
             "com.db.pbc.dbspain",
-            // Curve
+            
             "com.imaginecurve.curve.prd",
-            // Vivid Money
+            
             "money.vivid.app",
-            // bunq
+            
             "com.bunq.android",
-            // Google Wallet / Pay
+            
             "com.google.android.apps.walletnfcrel"
         )
 
-        // 1. Patrón con símbolo monetario o código ISO explícito (€, EUR, $, USD, £, GBP)
-        // Soporta formatos: 12,50€, 12.50 €, 12,50 EUR, €12.50, $ 15.00, 1.250,50€, 1,250.50 $
+        
+        
         private val CURRENCY_AMOUNT_PATTERN: Pattern = Pattern.compile(
             """(?:[€$£]|EUR|USD|GBP)\s*([+-]?\s*\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|[+-]?\s*\d+(?:[.,]\d{1,2})?)|([+-]?\s*\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|[+-]?\s*\d+(?:[.,]\d{1,2})?)\s*(?:[€$£]|EUR|USD|GBP)""",
             Pattern.CASE_INSENSITIVE
         )
 
-        // 2. Patrón con palabra clave financiera previa seguida de importe numérico
-        // Soporta: "bizum de 20,00", "pago por 15.50", "cargo: 45,90", "recibido 100,00", "compra de 19.99"
+        
+        
         private val KEYWORD_AMOUNT_PATTERN: Pattern = Pattern.compile(
             """(?:IMPORTE|CARGO|ABONO|MONTO|TOTAL|PRECIO|VALOR|CANTIDAD|SALDO|PAGO|COBRO|GASTO|BIZUM|COMPRA|TRANSFERENCIA|TRASPASO PROPIO|TRASPASO|DEVOLUCION|REEMBOLSO|ENVIO|ENVIADO|RECIBIDO|ADEUDO|ADEUDO DIRECTO|ADEUDO SEPA|CUOTA|FINANCIACION|INGRESO|POR VALOR DE|POR IMPORTE DE)\s*(?:DE|POR|:)?\s*([+-]?\s*\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|[+-]?\s*\d+(?:[.,]\d{1,2})?)""",
             Pattern.CASE_INSENSITIVE
@@ -238,30 +238,30 @@ class BankNotificationListenerService : NotificationListenerService() {
         val text = extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
         val bigText = extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
 
-        // LOG GLOBAL DE DIAGNÓSTICO EN LOGCAT (OBLIGATORIO: Primera línea antes de cualquier if/filtro)
+        
         Log.d("BANK_TEST", "$pkg | Title: $title | Text: $text | BigText: $bigText")
 
-        // Evitar bucle: ignorar las notificaciones generadas por nuestra propia app
+        
         if (pkg == packageName) return
 
-        // Extracción completa de todos los metadatos disponibles (Título, Texto, BigText, SubText, TextLines)
+        
         val fullRawText = extractAllNotificationText(sbn)
         val normalizedText = cleanAndNormalizeText(fullRawText)
 
-        // 1. Filtrar por Package Name o contenido financiero
+        
         if (!isAllowedPackageOrContent(pkg, normalizedText)) {
             Log.d(TAG, "Notificación ignorada: app no bancaria/financiera autorizada ($pkg)")
             return
         }
 
-        // 2. Extracción de importe
+        
         val amount = extractAmount(fullRawText, normalizedText)
         if (amount == null || amount <= 0.0) {
             Log.d(TAG, "No se detectó importe válido en la notificación de $pkg: '$fullRawText'")
             return
         }
 
-        // 3. Detección de intención (Ingreso vs Gasto)
+        
         val (isIncome, isExpense) = detectFinancialIntent(normalizedText)
 
         if (!isIncome && !isExpense) {
@@ -318,7 +318,7 @@ class BankNotificationListenerService : NotificationListenerService() {
     private fun isAllowedPackageOrContent(pkg: String, normalizedText: String): Boolean {
         if (pkg.isEmpty()) return false
 
-        // Apps explícitamente bloqueadas (mensajería, redes, sistema genérico)
+        
         val blockedPackages = listOf(
             "kdeconnect", "whatsapp", "telegram", "android", "systemui",
             "chrome", "google.android.googlequicksearchbox", "instagram",
@@ -329,10 +329,10 @@ class BankNotificationListenerService : NotificationListenerService() {
             return false
         }
 
-        // Directamente autorizada en lista blanca de entidades bancarias/financieras
+        
         if (pkg in ALLOWED_BANK_PACKAGES) return true
 
-        // Coincidencia por palabra clave bancaria en el paquete
+        
         val lowercasePkg = pkg.lowercase()
         val bankKeywords = listOf(
             "caixabank", "imagin", "bbva", "santander", "sabadell", "bankinter",
@@ -344,7 +344,7 @@ class BankNotificationListenerService : NotificationListenerService() {
         )
         if (bankKeywords.any { lowercasePkg.contains(it) }) return true
 
-        // Fallback: Si el texto contiene frases inequívocas de operativa financiera
+        
         val explicitFinancialPhrases = listOf(
             "BIZUM", "PAGO CON TARJETA", "COMPRA CON TARJETA", "CARGO EN CUENTA",
             "ABONO EN CUENTA", "ABONO DE TRASPASO", "TRASPASO PROPIO", "ABONO",
@@ -374,14 +374,14 @@ class BankNotificationListenerService : NotificationListenerService() {
 
         if (clean.contains(",") && clean.contains(".")) {
             if (clean.lastIndexOf(",") > clean.lastIndexOf(".")) {
-                // Formato europeo: 1.250,50 -> 1250.50
+                
                 clean = clean.replace(".", "").replace(",", ".")
             } else {
-                // Formato anglosajón: 1,250.50 -> 1250.50
+                
                 clean = clean.replace(",", "")
             }
         } else if (clean.contains(",")) {
-            // Formato decimal con coma: 12,50 -> 12.50
+            
             clean = clean.replace(",", ".")
         }
 
@@ -390,7 +390,7 @@ class BankNotificationListenerService : NotificationListenerService() {
     }
 
     private fun extractAmount(rawText: String, normalizedText: String): Double? {
-        // 1. Verificar coincidencia con símbolo monetario adjunto en texto original (€, EUR, $, USD, £, GBP)
+        
         val currencyMatcher = CURRENCY_AMOUNT_PATTERN.matcher(rawText)
         while (currencyMatcher.find()) {
             val group = currencyMatcher.group(1) ?: currencyMatcher.group(2)
@@ -400,7 +400,7 @@ class BankNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // 2. Verificar sobre el texto normalizado
+        
         val normCurrencyMatcher = CURRENCY_AMOUNT_PATTERN.matcher(normalizedText)
         while (normCurrencyMatcher.find()) {
             val group = normCurrencyMatcher.group(1) ?: normCurrencyMatcher.group(2)
@@ -410,7 +410,7 @@ class BankNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // 3. Verificar coincidencia con palabra clave financiera explícita (IMPORTE, CARGO, ABONO, BIZUM, PAGO, etc.)
+        
         val keywordMatcher = KEYWORD_AMOUNT_PATTERN.matcher(normalizedText)
         while (keywordMatcher.find()) {
             val group = keywordMatcher.group(1)
@@ -431,7 +431,7 @@ class BankNotificationListenerService : NotificationListenerService() {
         ).any { normalizedText.contains(it) }
 
         if (isExplicitIncome) {
-            return Pair(true, false) // Es un ingreso garantizado
+            return Pair(true, false) 
         }
 
         val isExpense = UNIVERSAL_EXPENSE_KEYWORDS.any { normalizedText.contains(it) }
@@ -463,7 +463,7 @@ class BankNotificationListenerService : NotificationListenerService() {
 
                 var matchedCategoryName: String? = null
 
-                // Detección de retirada en cajero
+                
                 val containsCajero = normalizedText.contains("CAJERO")
                 val containsReint = normalizedText.contains("REINT") || normalizedText.contains("REINTEGRO")
                 val containsRetiradaEfectivo = normalizedText.contains("RETIRADA DE EFECTIVO") || normalizedText.contains("RETIRADA EN CAJERO")
@@ -498,7 +498,7 @@ class BankNotificationListenerService : NotificationListenerService() {
                             Log.i(TAG, "Categoría en efectivo emparejada y marcada como pagada: ${matchingCashCat.name}")
                         }
                     } else {
-                        // Gasto bancario/tarjeta estándar: emparejar categoría no pagada
+                        
                         val unpaidBankCategories = categories.filter { !it.isCashPayment && !it.isPaid }
 
                         var matchingBankCat = unpaidBankCategories.find { cat ->
@@ -523,14 +523,14 @@ class BankNotificationListenerService : NotificationListenerService() {
                     }
                 }
 
-                // Actualizar widgets de la pantalla de inicio
+                
                 try {
                     WidgetUpdateHelper.updateAllWidgets(applicationContext)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error actualizando widgets tras notificación bancaria: ${e.message}")
                 }
 
-                // Lanzar notificación local de confirmación al usuario
+                
                 showConfirmationNotification(amount, newBalance, isIncome, matchedCategoryName, isCashWithdrawal)
             }
         }

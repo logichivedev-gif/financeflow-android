@@ -17,7 +17,7 @@ class FinanceActionsWidgetProvider : AppWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(appContext.packageName, R.layout.widget_actions_layout)
 
-            // 1. Add Expense Button Intent
+            
             val expenseIntent = Intent(appContext, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("action", "add_expense")
@@ -30,7 +30,7 @@ class FinanceActionsWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_btn_add_expense, expensePendingIntent)
 
-            // 2. Add Income/Balance Button Intent
+            
             val incomeIntent = Intent(appContext, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("action", "add_income")
@@ -43,7 +43,7 @@ class FinanceActionsWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_btn_add_income, incomePendingIntent)
 
-            // 3. Open App Button Intent
+            
             val appIntent = Intent(appContext, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
@@ -55,7 +55,7 @@ class FinanceActionsWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_btn_view_app, appPendingIntent)
 
-            // Push updates
+            
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }

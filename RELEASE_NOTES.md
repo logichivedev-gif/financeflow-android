@@ -59,3 +59,19 @@
 - **Recuperación de Backup Manual (.fflow)**: Restauración de la sección en `SettingsScreen.kt` y `UnifiedSettingsDialog.kt` con soporte completo de Storage Access Framework (`CreateDocument` y `OpenDocument`) para exportar e importar ficheros `.fflow`/`.json` en cualquier almacenamiento local o en la nube.
 - **Restauración Inteligente**: `restoreAutoBackupExternal` localiza y valida automáticamente el respaldo en `Documents/FinanceFlow/`, garantizando la reconstrucción total de la base de datos de Room.
 
+---
+
+### 🎯 10. Motor Universal de Saldo Libre Real por Ciclo de Ingreso Dinámico y Recurrentes Multi-Mes
+- **Ventana temporal dinámica de cobro**: Cálculo matemático ajustado a la ventana $Día\_Actual \rightarrow (Próximo\_Cobro - 1\_día)$ en función del `incomeDay` de cada usuario (ejemplo: si cobra el 10 y hoy es 16-sept, la ventana abarca del 16-sept al 09-oct).
+- **Tratamiento estricto de gastos fijos recurrentes de principio de mes**: Si un gasto fijo recurrente tiene `payDay < currentDay` (ejemplo: Alquiler día 5) y ya se pagó este mes, el motor detecta que vencerá nuevamente a principios del mes que viene (5 de octubre) antes de la próxima nómina (10 de octubre), computándolo obligatoriamente en el saldo libre para evitar saldos falsamente positivos y prevenir descubiertos.
+- **Fórmula Universal sin distorsión**: $\text{Saldo Libre Real} = \text{Saldo\_Banco\_Actual} - \text{Gastos\_Obligatorios\_del\_Ciclo}$.
+- **Interoperabilidad `LocalDate` y `Calendar`**: Métodos `getPendingExpensesForCycle` y `getPendingCategoriesForCycle` en `FinanceViewModel` compatibles con `Calendar` y `java.time.LocalDate` para consumo unificado en Dashboard, Análisis y Widgets.
+- **Suite de tests unitarios al 100% en verde**: Validación automatizada en `FinanceViewModelTest` cubriendo el caso exacto de déficit (-10,80 € frente al saldo falso de 759 €), días de cobro intermedios, recibos previos/posteriores y widgets sincronizados.
+
+---
+
+### 🏛️ 11. Arquitectura de Dominio Aislada y Protección de Compilador (@CriticalFinancialEngine)
+- **Anotación `@CriticalFinancialEngine`**: Anotación personalizada con `@RequiresOptIn(level = RequiresOptIn.Level.ERROR)` para bloquear cambios no intencionados o refactorizaciones accidentales en el motor de tesorería y liquidez tanto en IDE como en compilación.
+- **Caso de Uso de Dominio (`CalculateCycleBalanceUseCase`)**: Encapsulación completa de la lógica matemática del ciclo en la capa de dominio (`com.example.domain`), dejando a `FinanceViewModel` como simple consumidor que expone el estado reactivo hacia la UI sin mezclar fórmulas en los composables de Jetpack Compose.
+- **Pruebas unitarias de dominio dedicadas**: Validación exhaustiva en `CalculateCycleBalanceUseCaseTest` cubriendo cobros en días variables (ej. día 28), meses cortos (febrero con cobros a día 31 sin desbordes de fecha) y cálculo exacto de saldo libre real.
+

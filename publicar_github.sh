@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
-konsole --hold -e bash -c 'cd /home/abel/Documentos/financeflowfinal && ./release.sh'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+konsole --hold -e bash -c "cd \"$SCRIPT_DIR\" && ./publish.sh"

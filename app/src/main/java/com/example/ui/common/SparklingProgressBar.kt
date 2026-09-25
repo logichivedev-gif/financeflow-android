@@ -40,19 +40,19 @@ fun SparklingProgressBar(
     val clampedProgress = progress.coerceIn(0f, 1f)
     val animatedProgress = remember { Animatable(0f) }
 
-    // Lista interna sin desencadenar recomposiciones innecesarias
+    
     val particles = remember { mutableStateListOf<SparkParticle>() }
 
     val sparkColors = remember {
         listOf(
-            Color(0xFFFFD700), // Dorado
-            Color(0xFFFF8C00), // Naranja chispa
-            Color(0xFFFFFFFF), // Blanco incandescente
+            Color(0xFFFFD700), 
+            Color(0xFFFF8C00), 
+            Color(0xFFFFFFFF), 
             progressColor
         )
     }
 
-    // Animación del progreso y físicas de partículas optimizadas
+    
     LaunchedEffect(clampedProgress) {
         val animationJob = launch {
             animatedProgress.animateTo(
@@ -68,7 +68,7 @@ fun SparklingProgressBar(
                 val dt = ((frameTime - lastTime) / 1_000_000_000f).coerceAtMost(0.05f)
                 lastTime = frameTime
 
-                // 1. Generar chispas ÚNICAMENTE durante el movimiento
+                
                 if (animationJob.isActive && animatedProgress.value > 0.02f) {
                     val rand = ThreadLocalRandom.current()
                     repeat(3) {
@@ -86,14 +86,14 @@ fun SparklingProgressBar(
                     }
                 }
 
-                // 2. Actualizar posición y desvanecimiento
+                
                 val iterator = particles.iterator()
                 while (iterator.hasNext()) {
                     val p = iterator.next()
                     p.x += p.vx * dt
                     p.y += p.vy * dt
-                    p.vy += 350f * dt // Gravedad
-                    p.alpha -= 2.2f * dt // Extinción rápida
+                    p.vy += 350f * dt 
+                    p.alpha -= 2.2f * dt 
 
                     if (p.alpha <= 0f) {
                         iterator.remove()
@@ -113,7 +113,7 @@ fun SparklingProgressBar(
         val totalWidth = size.width
         val currentProgressPx = totalWidth * animatedProgress.value
 
-        // Fondo (Track)
+        
         drawRoundRect(
             color = trackColor,
             topLeft = Offset(0f, barTop),
@@ -121,7 +121,7 @@ fun SparklingProgressBar(
             cornerRadius = CornerRadius(barHeight / 2f, barHeight / 2f)
         )
 
-        // Relleno (Progress) con degradado
+        
         if (currentProgressPx > 0f) {
             val gradientBrush = Brush.horizontalGradient(
                 colors = listOf(progressColor.copy(alpha = 0.7f), progressColor),
@@ -136,7 +136,7 @@ fun SparklingProgressBar(
                 cornerRadius = CornerRadius(barHeight / 2f, barHeight / 2f)
             )
 
-            // Destello incandescente en el punto de contacto (frente de la sierra)
+            
             if (animatedProgress.isRunning) {
                 drawCircle(
                     color = Color.White.copy(alpha = 0.8f),
@@ -146,7 +146,7 @@ fun SparklingProgressBar(
             }
         }
 
-        // Dibujar chispas
+        
         clipRect(0f, 0f, size.width, size.height) {
             particles.forEach { p ->
                 drawCircle(

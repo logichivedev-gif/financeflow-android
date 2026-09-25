@@ -43,7 +43,7 @@ object UpdateChecker {
                 val tagName = jsonResponse.optString("tag_name", "").trim()
                 val body = jsonResponse.optString("body", "")
 
-                // Find browser_download_url for APK inside assets list
+                
                 var apkDownloadUrl = jsonResponse.optString("html_url", "")
                 val assets = jsonResponse.optJSONArray("assets")
                 if (assets != null && assets.length() > 0) {
@@ -76,7 +76,7 @@ object UpdateChecker {
     }
 
     private fun isNewerVersion(current: String, latest: String): Boolean {
-        // Clean prefixes like 'v' if present (e.g. v1.1.0 -> 1.1.0)
+        
         val cleanCurrent = current.removePrefix("v").trim()
         val cleanLatest = latest.removePrefix("v").trim()
 

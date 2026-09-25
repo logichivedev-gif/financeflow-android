@@ -75,7 +75,7 @@ fun FinanceApp(
     var selectedSettingsTab by remember { mutableStateOf(0) }
     var showAboutDialog by remember { mutableStateOf(false) }
 
-    // Sincronizar colores temáticos según la preferencia del perfil
+    
     val activeThemeId = dbProfile?.selectedTheme ?: "azul"
     LaunchedEffect(activeThemeId) {
         when (activeThemeId) {
@@ -123,7 +123,7 @@ fun FinanceApp(
                 drawerContainerColor = Color(0xFF0F121A),
                 modifier = Modifier.width(310.dp)
             ) {
-                // Cabecera de usuario
+                
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -359,7 +359,7 @@ fun FinanceApp(
         }
     }
 
-    // Diálogo Único de Ajustes Unificado (v1.6.0)
+    
     if (activeDialog == SettingDialogType.SETTINGS ||
         activeDialog == SettingDialogType.PROFILE ||
         activeDialog == SettingDialogType.WIZARD_FIXED ||

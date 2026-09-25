@@ -27,7 +27,7 @@ class DailyBackupWorker(
         Log.d(TAG, "Iniciando proceso de backup diario automático...")
 
         try {
-            // 1. Forzar checkpoint de WAL en la base de datos Room si está activa
+            
             try {
                 val db = FinanceDatabase.getDatabase(context)
                 db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { cursor ->
@@ -38,7 +38,7 @@ class DailyBackupWorker(
                 Log.w(TAG, "No se pudo forzar checkpoint WAL (puede que la DB esté en otro estado): ${e.message}")
             }
 
-            // 2. Localizar el archivo principal de la base de datos
+            
             var dbFile = context.getDatabasePath(FinanceDatabase.DATABASE_NAME)
             if (!dbFile.exists()) {
                 val alternativeDbFile = context.getDatabasePath("finance_database.db")
@@ -52,13 +52,13 @@ class DailyBackupWorker(
                 return@withContext Result.success()
             }
 
-            // 3. Crear o sobreescribir backup_previous.db en context.filesDir
+            
             val backupFile = File(context.filesDir, BACKUP_FILE_NAME)
             
-            // Copia directa y atómica sobrescribiendo el archivo del día anterior
+            
             dbFile.copyTo(backupFile, overwrite = true)
 
-            // 4. Generar backup JSON rotativo permanente en /Documents/FinanceFlow/backup_previous_24h.json
+            
             try {
                 val db = FinanceDatabase.getDatabase(context)
                 val repository = FinanceRepository(db.financeDao())
@@ -78,7 +78,7 @@ class DailyBackupWorker(
                 Log.w(TAG, "No se pudo escribir backup externo en Documents/FinanceFlow: ${e.message}")
             }
 
-            // 5. Registrar timestamp del último backup
+            
             context.getSharedPreferences("backup_prefs", Context.MODE_PRIVATE)
                 .edit()
                 .putLong("last_daily_backup_time", System.currentTimeMillis())

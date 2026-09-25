@@ -39,7 +39,7 @@ fun ArchivedCategoriesPane(
             .background(FinanceSoftBg)
             .padding(16.dp)
     ) {
-        // Top Bar
+        
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,7 +78,7 @@ fun ArchivedCategoriesPane(
             }
         }
 
-        // Info Banner
+        
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,7 +106,7 @@ fun ArchivedCategoriesPane(
             }
         }
 
-        // List
+        
         if (archivedCategories.isEmpty()) {
             Box(
                 modifier = Modifier

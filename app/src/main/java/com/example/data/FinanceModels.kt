@@ -49,11 +49,11 @@ data class FinancialProfile(
     val hasKids: Boolean = false,
     val kidsCost: Double = 100.0,
     val sharedExpenses: Boolean = false,
-    val partnerContribution: Double = 0.0, // fixed monthly partner contribution cash
-    val waterBilling: String = "Mensual", // "Mensual" or "Bimensual"
+    val partnerContribution: Double = 0.0, 
+    val waterBilling: String = "Mensual", 
     val waterCost: Double = 40.0,
     val isWaterAdded: Boolean = false,
-    val electricityBilling: String = "Mensual", // "Mensual" or "Bimensual"
+    val electricityBilling: String = "Mensual", 
     val electricityCost: Double = 60.0,
     val isElectricityAdded: Boolean = false,
     val currentBankBalance: Double = -1.0,
@@ -80,27 +80,27 @@ data class FinancialProfile(
 
 @Entity(tableName = "expense_categories")
 data class ExpenseCategory(
-    @PrimaryKey val id: String, // unique id, e.g. "alquiler", "gimnasio", "luz", etc.
+    @PrimaryKey val id: String, 
     val name: String,
-    val limitAmount: Double, // calculated monthly limit or monthly equivalent cost
-    val isFixed: Boolean, // true for fixed expenses (facturas), false for variable budgets
-    val isPaid: Boolean = false, // true if marked paid for fixed expenses
-    val isFromWizardExtra: Boolean = false, // if added in step 4 extras
-    val billingCycle: String = "Mensual", // "Mensual" or "Bimensual" for supplies
-    val rawAmount: Double = 0.0, // original user input amount
-    val isAdded: Boolean = true, // true if active
-    val payDay: Int? = null, // Set payDay (day of month, e.g. 5, 10, etc.)
-    val isVariableBill: Boolean = false, // If this fixed expense changes details/amount each month (like luz, agua, etc.)
-    val assumedByPartner: Boolean = false, // If the partner pays this bill at 100% and it shouldn't subtract from user's budget
-    val isFinancing: Boolean = false, // If it is a financing/loan/installment
-    val monthsRemaining: Int? = null, // Number of months remaining for financing
-    val totalInstallments: Int? = null, // Total de cuotas (ej: 12, 24, 36)
-    val currentInstallment: Int? = null, // Cuota actual (ej: 1, 5, etc.)
-    val financingStartDate: Long? = null, // Fecha de inicio de la financiación (timestamp ms)
-    val isSkippedThisMonth: Boolean = false, // If a bimonthly/quarterly expense is skipped or not due this month
-    val isInsurance: Boolean = false, // If it is an insurance policy (coche, hogar, salud, vida, etc.)
-    val isCashPayment: Boolean = false, // If paid in cash / non-bank payment
-    val isArchived: Boolean = false // If marked as archived for fixed expenses history
+    val limitAmount: Double, 
+    val isFixed: Boolean, 
+    val isPaid: Boolean = false, 
+    val isFromWizardExtra: Boolean = false, 
+    val billingCycle: String = "Mensual", 
+    val rawAmount: Double = 0.0, 
+    val isAdded: Boolean = true, 
+    val payDay: Int? = null, 
+    val isVariableBill: Boolean = false, 
+    val assumedByPartner: Boolean = false, 
+    val isFinancing: Boolean = false, 
+    val monthsRemaining: Int? = null, 
+    val totalInstallments: Int? = null, 
+    val currentInstallment: Int? = null, 
+    val financingStartDate: Long? = null, 
+    val isSkippedThisMonth: Boolean = false, 
+    val isInsurance: Boolean = false, 
+    val isCashPayment: Boolean = false, 
+    val isArchived: Boolean = false 
 ) {
     val isInsurancePolicy: Boolean
         get() = isInsurance
@@ -130,7 +130,7 @@ data class ExpenseCategory(
             val total = effectiveTotalInstallments
             if (total <= 0) return 1
             if (currentInstallment != null && currentInstallment > 0) {
-                // Si monthsRemaining contradice fuertemente un currentInstallment inicial (ej: quedan 2 de 9)
+                
                 val rem = monthsRemaining
                 if (rem != null && currentInstallment == 1 && total > 2 && rem < total) {
                     val activeIndex = (total - rem + (if (isPaid) 0 else 1)).coerceIn(1, total)
@@ -154,8 +154,8 @@ data class ExpenseCategory(
 @Entity(tableName = "variable_expenses")
 data class VariableExpenseEntry(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val categoryId: String, // references ExpenseCategory ID, e.g., "comida"
-    val categoryName: String, // Display name e.g., "Comida"
+    val categoryId: String, 
+    val categoryName: String, 
     val amount: Double,
     val timestamp: Long = System.currentTimeMillis()
 )

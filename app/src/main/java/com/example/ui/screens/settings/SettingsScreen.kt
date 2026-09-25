@@ -31,7 +31,7 @@ fun BackupAndRestoreSection(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Exportar manual (.fflow / .json)
+    
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -47,7 +47,7 @@ fun BackupAndRestoreSection(
         }
     }
 
-    // Importar manual (.fflow / .json)
+    
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -64,7 +64,7 @@ fun BackupAndRestoreSection(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // CARD 1: BACKUP MANUAL (.fflow)
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -100,7 +100,7 @@ fun BackupAndRestoreSection(
             }
         }
 
-        // CARD 2: BACKUP AUTOMÁTICO ROTATIVO 24H (En /Documents/FinanceFlow/)
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),

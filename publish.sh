@@ -2,7 +2,8 @@
 
 set -e
 
-PROJECT_DIR="C:/Users/Abel/Documents/Proyectos Android/financeflowfinal"
+# Detectar automáticamente la ruta actual en Nobara Linux
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROP_FILE="$PROJECT_DIR/app/version.properties"
 NOTES_FILE="$PROJECT_DIR/RELEASE_NOTES.md"
 
@@ -63,7 +64,7 @@ git config user.name "logichivedev-gif"
 
 echo "📤 Subiendo cambios de código a GitHub..."
 git add .
-git commit -m "Release ${VERSION_TAG} - Actualizacion de binarios (Cambios: ${CHANGES:-0}/10)" --allow-empty
+git commit -m "Release ${VERSION_TAG} - Actualización de binarios (Cambios: ${CHANGES:-0}/10)" --allow-empty
 git push origin main
 
 if [ -f "$NOTES_FILE" ]; then
@@ -72,9 +73,6 @@ if [ -f "$NOTES_FILE" ]; then
 else
     RELEASE_NOTES="Release automática de **$VERSION_TAG**."
 fi
-
-# Añadir el PATH de GitHub CLI por si acaso
-export PATH="$PATH:/c/Program Files/GitHub CLI"
 
 echo "🌐 Publicando Release en GitHub..."
 if gh release view "$VERSION_TAG" >/dev/null 2>&1; then

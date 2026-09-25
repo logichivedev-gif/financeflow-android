@@ -46,33 +46,33 @@ class BackupManager(
         try {
             val backupData = adapter.fromJson(jsonString) ?: return@withContext false
 
-            // Validación rigurosa de estructura mínima
+            
             if (backupData.profile == null && backupData.categories.isEmpty() && backupData.expenses.isEmpty()) {
                 return@withContext false
             }
 
-            // Realizamos la limpieza e inserción masiva secuencial
-            // Para asegurar atomicidad completa, iniciamos una transacción manual en SQLite
+            
+            
             database.beginTransaction()
             try {
                 val dao = database.financeDao()
 
-                // 1. Limpiar datos existentes
+                
                 dao.clearFinancialProfile()
                 dao.clearExpenseCategories()
                 dao.clearVariableExpenses()
 
-                // 2. Restaurar Perfil Financiero
+                
                 backupData.profile?.let {
                     dao.insertFinancialProfile(it)
                 }
 
-                // 3. Restaurar Categorías de Gasto
+                
                 if (backupData.categories.isNotEmpty()) {
                     dao.insertExpenseCategories(backupData.categories)
                 }
 
-                // 4. Restaurar Gastos Variables
+                
                 if (backupData.expenses.isNotEmpty()) {
                     for (expense in backupData.expenses) {
                         dao.insertVariableExpense(expense)
@@ -113,21 +113,21 @@ class BackupManager(
                 return@withContext false
             }
 
-            // 1. Cerrar la conexión actual de Room
+            
             FinanceDatabase.closeDatabase()
 
             val dbFile = context.getDatabasePath(FinanceDatabase.DATABASE_NAME)
             val walFile = java.io.File(dbFile.path + "-wal")
             val shmFile = java.io.File(dbFile.path + "-shm")
 
-            // 2. Limpiar ficheros auxiliares WAL y SHM para evitar incongruencias
+            
             if (walFile.exists()) walFile.delete()
             if (shmFile.exists()) shmFile.delete()
 
-            // 3. Sobreescribir el archivo de base de datos principal con la copia de respaldo
+            
             backupFile.copyTo(dbFile, overwrite = true)
 
-            // 4. Reabrir e instanciar la base de datos para verificar su consistencia
+            
             val newDb = FinanceDatabase.getDatabase(context)
             val profile = newDb.financeDao().getFinancialProfileDirect()
             android.util.Log.i("BackupManager", "✅ Restauración rápida de backup completada con éxito. Perfil: ${profile?.userName}")

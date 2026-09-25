@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.example.domain.CalculateCycleBalanceUseCase
+import com.example.domain.CriticalFinancialEngine
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -70,7 +72,8 @@ data class MonthProjection(
 
 class FinanceViewModel(
     val repository: FinanceRepository,
-    val database: FinanceDatabase
+    val database: FinanceDatabase,
+    val calculateCycleBalanceUseCase: CalculateCycleBalanceUseCase = CalculateCycleBalanceUseCase()
 ) : ViewModel() {
 
     val currentSortOrder = mutableStateOf(SortOrder.BY_DATE)
@@ -494,95 +497,107 @@ class FinanceViewModel(
         return referenceCalendarForTesting?.clone() as? java.util.Calendar ?: java.util.Calendar.getInstance()
     }
 
+    @OptIn(CriticalFinancialEngine::class)
     fun shouldRetainUnpaidFixedExpense(
         payDay: Int?,
         incomeDay: Int,
         currentDate: java.util.Calendar = getCurrentCalendar()
     ): Boolean {
-        return isBillInCycleWindow(payDay, incomeDay, currentDate)
+        return calculateCycleBalanceUseCase.isBillInCycleWindow(payDay, incomeDay, currentDate)
     }
 
+    @OptIn(CriticalFinancialEngine::class)
+    fun isCategoryPendingInCycle(
+        category: ExpenseCategory,
+        incomeDay: Int,
+        currentDate: java.util.Calendar = getCurrentCalendar()
+    ): Boolean {
+        return calculateCycleBalanceUseCase.isCategoryPendingInCycle(category, incomeDay, currentDate)
+    }
+
+    @OptIn(CriticalFinancialEngine::class)
+    fun getPendingCategoriesForCycle(
+        dbCategories: List<ExpenseCategory>,
+        incomeDay: Int,
+        currentDate: java.util.Calendar = getCurrentCalendar()
+    ): List<ExpenseCategory> {
+        return calculateCycleBalanceUseCase.getPendingCategoriesForCycle(dbCategories, incomeDay, currentDate)
+    }
+
+    @OptIn(CriticalFinancialEngine::class)
+    fun getPendingExpensesForCycle(
+        dbCategories: List<ExpenseCategory>,
+        incomeDay: Int,
+        currentDate: java.util.Calendar = getCurrentCalendar()
+    ): Double {
+        return calculateCycleBalanceUseCase.getPendingExpensesForCycle(dbCategories, incomeDay, currentDate)
+    }
+
+    @OptIn(CriticalFinancialEngine::class)
+    fun getPendingExpensesForCycle(
+        dbCategories: List<ExpenseCategory>,
+        incomeDay: Int,
+        currentDate: java.time.LocalDate
+    ): Double {
+        return calculateCycleBalanceUseCase.getPendingExpensesForCycle(dbCategories, incomeDay, currentDate)
+    }
+
+    @OptIn(CriticalFinancialEngine::class)
     fun calculateSaldoLibreReal(
         currentBank: Double,
         profile: FinancialProfile,
         categories: List<ExpenseCategory>,
         currentDate: java.util.Calendar = getCurrentCalendar()
     ): Double {
-        val pendingCategories = categories.filter { category ->
-            !category.isArchived && 
-            (category.isFixed || category.isFinancing) && 
-            !category.assumedByPartner && 
-            !category.isPaid && 
-            !category.isSkippedThisMonth &&
-            shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay, currentDate)
-        }
-
-        val pendingFixed = pendingCategories.sumOf { category ->
-            if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
-        }
-
-        val baseMoney = if (profile.currentBankBalance != -1.0 && profile.currentBankBalance >= 0.0) {
-            currentBank
-        } else {
-            profile.monthlyIncome + profile.partnerContribution
-        }
-
-        return baseMoney - pendingFixed
+        return calculateCycleBalanceUseCase(currentBank, profile, categories, currentDate)
     }
 
     companion object {
+        @OptIn(CriticalFinancialEngine::class)
         fun isBillInCycleWindow(
             payDay: Int?,
             incomeDay: Int,
             currentDate: java.util.Calendar = java.util.Calendar.getInstance()
         ): Boolean {
-            if (payDay == null || payDay <= 0) return true
-            val validIncomeDay = if (incomeDay in 1..31) incomeDay else 1
-
-            val todayCal = (currentDate.clone() as java.util.Calendar).apply {
-                set(java.util.Calendar.HOUR_OF_DAY, 0)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }
-            val todayDay = todayCal.get(java.util.Calendar.DAY_OF_MONTH)
-
-            val nextIncomeCal = (todayCal.clone() as java.util.Calendar).apply {
-                if (todayDay >= validIncomeDay) {
-                    add(java.util.Calendar.MONTH, 1)
-                }
-                val maxDays = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-                set(java.util.Calendar.DAY_OF_MONTH, minOf(validIncomeDay, maxDays))
-            }
-
-            val cycleEndCal = (nextIncomeCal.clone() as java.util.Calendar).apply {
-                add(java.util.Calendar.DAY_OF_MONTH, -1)
-            }
-
-            // Bill occurrence in the month of todayCal
-            val billCalCurrent = (todayCal.clone() as java.util.Calendar).apply {
-                val maxDays = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-                set(java.util.Calendar.DAY_OF_MONTH, minOf(payDay, maxDays))
-            }
-            if (!billCalCurrent.before(todayCal) && !billCalCurrent.after(cycleEndCal)) {
-                return true
-            }
-
-            // Bill occurrence in the month of cycleEndCal (if different month)
-            if (cycleEndCal.get(java.util.Calendar.MONTH) != todayCal.get(java.util.Calendar.MONTH) ||
-                cycleEndCal.get(java.util.Calendar.YEAR) != todayCal.get(java.util.Calendar.YEAR)
-            ) {
-                val billCalNext = (cycleEndCal.clone() as java.util.Calendar).apply {
-                    val maxDays = getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-                    set(java.util.Calendar.DAY_OF_MONTH, minOf(payDay, maxDays))
-                }
-                if (!billCalNext.before(todayCal) && !billCalNext.after(cycleEndCal)) {
-                    return true
-                }
-            }
-
-            return false
+            return CalculateCycleBalanceUseCase.INSTANCE.isBillInCycleWindow(payDay, incomeDay, currentDate)
         }
+
+        @OptIn(CriticalFinancialEngine::class)
+        fun isCategoryPendingInCycle(
+            category: ExpenseCategory,
+            incomeDay: Int,
+            currentDate: java.util.Calendar = java.util.Calendar.getInstance()
+        ): Boolean {
+            return CalculateCycleBalanceUseCase.INSTANCE.isCategoryPendingInCycle(category, incomeDay, currentDate)
+        }
+
+        @OptIn(CriticalFinancialEngine::class)
+        fun getPendingCategoriesForCycle(
+            categories: List<ExpenseCategory>,
+            incomeDay: Int,
+            currentDate: java.util.Calendar = java.util.Calendar.getInstance()
+        ): List<ExpenseCategory> {
+            return CalculateCycleBalanceUseCase.INSTANCE.getPendingCategoriesForCycle(categories, incomeDay, currentDate)
+        }
+
+        @OptIn(CriticalFinancialEngine::class)
+        fun getPendingExpensesForCycle(
+            dbCategories: List<ExpenseCategory>,
+            incomeDay: Int,
+            currentDate: java.util.Calendar = java.util.Calendar.getInstance()
+        ): Double {
+            return CalculateCycleBalanceUseCase.INSTANCE.getPendingExpensesForCycle(dbCategories, incomeDay, currentDate)
+        }
+
+        @OptIn(CriticalFinancialEngine::class)
+        fun getPendingExpensesForCycle(
+            dbCategories: List<ExpenseCategory>,
+            incomeDay: Int,
+            currentDate: java.time.LocalDate
+        ): Double {
+            return CalculateCycleBalanceUseCase.INSTANCE.getPendingExpensesForCycle(dbCategories, incomeDay, currentDate)
+        }
+
         fun isBillScheduledDateInPastOrToday(payDay: Int, incomeDay: Int): Boolean {
             val today = java.util.Calendar.getInstance()
             val todayDay = today.get(java.util.Calendar.DAY_OF_MONTH)
@@ -715,12 +730,7 @@ class FinanceViewModel(
 
         val projectedVariable = totalVariable + remainingVariable
 
-        val pendingFixed = categories.filter { category ->
-            !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isSkippedThisMonth && !category.isPaid &&
-            shouldRetainUnpaidFixedExpense(category.payDay, profile.incomeDay, getCurrentCalendar())
-        }.sumOf { category ->
-            if (category.rawAmount > 0.0 && category.billingCycle != "Mensual") category.rawAmount else category.limitAmount
-        }
+        val pendingFixed = getPendingExpensesForCycle(categories, profile.incomeDay, getCurrentCalendar())
 
         val projectedMonthEndBalance = currentBank - pendingFixed - remainingVariable
         val projectedMonthEndSpent = projectedVariable + totalFixed

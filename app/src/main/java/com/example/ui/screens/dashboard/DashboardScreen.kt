@@ -1717,10 +1717,7 @@ fun AnalysisPane(
     val gastoVariableHoy = gastoVariableHoyInput.toDoubleOrNull() ?: realGastoVariableHoy
 
     val unpaidFixedExpenses = remember(dbCategories, dbProfile) {
-        dbCategories.filter { category ->
-            !category.isArchived && (category.isFixed || category.isFinancing) && !category.assumedByPartner && !category.isSkippedThisMonth && !category.isPaid &&
-                    viewModel.shouldRetainUnpaidFixedExpense(category.payDay, dbProfile?.incomeDay ?: 1)
-        }
+        viewModel.getPendingCategoriesForCycle(dbCategories, dbProfile?.incomeDay ?: 1)
     }
     val saldoRetenido = monthProjection?.pendingFixed ?: unpaidFixedExpenses.sumOf { if (it.rawAmount > 0.0 && it.billingCycle != "Mensual") it.rawAmount else it.limitAmount }
 

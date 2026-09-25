@@ -18,7 +18,7 @@ class NotificationAlarmReceiver : BroadcastReceiver() {
         Log.d("NotificationReceiver", "Received alarm trigger or system boot. Action: ${intent.action}")
         
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
-            // Re-schedule notifications on device boot
+            
             val workRequest = OneTimeWorkRequestBuilder<ScheduleNotificationsWorker>().build()
             WorkManager.getInstance(context.applicationContext).enqueue(workRequest)
             return

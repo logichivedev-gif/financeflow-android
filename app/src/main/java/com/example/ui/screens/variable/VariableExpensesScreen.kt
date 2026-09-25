@@ -65,7 +65,7 @@ fun VariableSpentPane(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Budget Overview Card
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -147,7 +147,7 @@ fun VariableSpentPane(
             }
         }
 
-        // Categories with Progress
+        
         Text(
             text = "Categorías de Gasto Cotidiano",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
@@ -241,7 +241,7 @@ fun VariableSpentPane(
                                 }
                             }
 
-                            // Progress Bar
+                            
                             LinearProgressIndicator(
                                 progress = { progress },
                                 modifier = Modifier
@@ -256,7 +256,7 @@ fun VariableSpentPane(
                 }
             }
 
-            // Recent Expenses Section
+            
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column {
                     Spacer(modifier = Modifier.height(10.dp))
@@ -327,7 +327,7 @@ fun VariableSpentPane(
         }
     }
 
-    // Dialog: Record Expense
+    
     if (showAddExpenseDialog) {
         AddExpenseEntryDialog(
             categories = variableCategories,
@@ -345,7 +345,7 @@ fun VariableSpentPane(
         )
     }
 
-    // Dialog: Add Variable Category
+    
     if (showAddCategoryDialog) {
         AddEditVariableCategoryDialog(
             category = null,
@@ -358,7 +358,7 @@ fun VariableSpentPane(
         )
     }
 
-    // Dialog: Edit Variable Category
+    
     editingCategory?.let { category ->
         AddEditVariableCategoryDialog(
             category = category,

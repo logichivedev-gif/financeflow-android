@@ -20,7 +20,7 @@ class ScheduleNotificationsWorker(
         val context = applicationContext
         
         try {
-            // Instancia única a través del Singleton para evitar duplicar descriptores de Room
+            
             val database = FinanceDatabase.getDatabase(context)
 
             val fixedExpenses = database.financeDao().getAllCategoriesDirect()
@@ -33,7 +33,7 @@ class ScheduleNotificationsWorker(
                 val payDay = item.payDay ?: continue
                 val triggerTime = calculateTriggerTime(payDay)
 
-                // ID único de alarma
+                
                 val alarmId = item.id.hashCode()
 
                 val intent = Intent(context, NotificationAlarmReceiver::class.java).apply {
@@ -42,7 +42,7 @@ class ScheduleNotificationsWorker(
                     putExtra("EXPENSE_AMOUNT", item.limitAmount)
                 }
 
-                // Paso 2: Idempotencia en AlarmManager usando FLAG_NO_CREATE
+                
                 val existingPendingIntent = PendingIntent.getBroadcast(
                     context,
                     alarmId,
@@ -92,7 +92,7 @@ class ScheduleNotificationsWorker(
                     )
                 }
                 
-                // Guardar confirmación en SharedPreferences
+                
                 sharedPrefs.edit().putLong("trigger_${item.id}", triggerTime).apply()
                 Log.d("ScheduleWorker", "Alarma programada por primera vez o actualizada para ${item.name} (día $payDay) en $triggerTime")
             }
@@ -108,7 +108,7 @@ class ScheduleNotificationsWorker(
     private fun calculateTriggerTime(payDay: Int): Long {
         val nowTime = System.currentTimeMillis()
 
-        // 1. Calcular el momento exacto de la alerta para el ciclo actual (el día anterior al payDay a las 09:00 AM)
+        
         val currentCycleAlert = Calendar.getInstance().apply {
             set(Calendar.DAY_OF_MONTH, payDay)
             add(Calendar.DAY_OF_MONTH, -1)
@@ -118,17 +118,17 @@ class ScheduleNotificationsWorker(
             set(Calendar.MILLISECOND, 0)
         }
 
-        // 2. Comparar el timestamp de la alerta contra el tiempo actual del sistema
+        
         return if (currentCycleAlert.timeInMillis <= nowTime) {
             val now = Calendar.getInstance()
             val isSameDay = now.get(Calendar.YEAR) == currentCycleAlert.get(Calendar.YEAR) &&
                     now.get(Calendar.DAY_OF_YEAR) == currentCycleAlert.get(Calendar.DAY_OF_YEAR)
 
             if (isSameDay) {
-                // Si es el mismo día y ya pasó la hora de la alarma, disparar 10 segundos después para recuperar la alerta
+                
                 nowTime + 10000
             } else {
-                // Si ya es un día posterior, programar para el siguiente ciclo mensual
+                
                 Calendar.getInstance().apply {
                     add(Calendar.MONTH, 1)
                     set(Calendar.DAY_OF_MONTH, payDay)
@@ -140,7 +140,7 @@ class ScheduleNotificationsWorker(
                 }.timeInMillis
             }
         } else {
-            // Mantener el tiempo del ciclo actual
+            
             currentCycleAlert.timeInMillis
         }
     }

@@ -40,7 +40,7 @@ private val LightColorScheme =
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = false,
-  // Dynamic color is disabled to enforce Natural Tones theme styling
+  
   dynamicColor: Boolean = false,
   theme: String = "azul",
   content: @Composable () -> Unit,

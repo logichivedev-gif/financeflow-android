@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.ExpenseCategory
@@ -9,6 +10,7 @@ import com.example.data.FinanceRepository
 import com.example.data.FinancialProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -47,6 +49,8 @@ class FinanceViewModelTest {
 
     @After
     fun tearDown() {
+        viewModel.viewModelScope.cancel()
+        testDispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
         database.close()
     }
@@ -534,5 +538,110 @@ class FinanceViewModelTest {
         assertEquals(false, FinanceViewModel.isBillInCycleWindow(10, incomeDay, calSept12)) // 10-oct (nuevo cobro)
         assertEquals(false, FinanceViewModel.isBillInCycleWindow(11, incomeDay, calSept12)) // 11-oct (post cobro)
         assertEquals(true, FinanceViewModel.isBillInCycleWindow(null, incomeDay, calSept12)) // Sin payDay
+    }
+
+    @Test
+    fun `recibos pagados de principios de mes vuelven a comprometerse si vencen antes del proximo cobro del siguiente mes`() = runTest {
+        backgroundScope.launch { viewModel.saldoRestanteDisponible.collect {} }
+        backgroundScope.launch { viewModel.dbCategories.collect {} }
+        backgroundScope.launch { viewModel.dbProfile.collect {} }
+
+        // Simular fecha fija: 16 de septiembre de 2026
+        val simulatedToday = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.SEPTEMBER, 16, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        viewModel.setReferenceCalendarForTesting(simulatedToday)
+
+        // Cobro el día 10 (próximo cobro: 10 de octubre). Ventana: 16-sept a 09-oct.
+        val profile = FinancialProfile(
+            id = 1,
+            currentBankBalance = 884.0,
+            monthlyIncome = 1500.0,
+            incomeDay = 10,
+            isWizardComplete = true
+        )
+        repository.saveFinancialProfile(profile)
+
+        val categories = listOf(
+            // Alquiler (380 €): payDay = 5. En septiembre ya se pagó (isPaid = true).
+            // Vencerá el 5 de octubre ANTES del cobro del 10 de octubre -> DEBE COMPROMETERSE
+            ExpenseCategory(
+                id = "alquiler",
+                name = "Alquiler",
+                limitAmount = 380.0,
+                isFixed = true,
+                isPaid = true,
+                payDay = 5,
+                isAdded = true
+            ),
+            // Préstamo (162.76 €): payDay = 1. Ya pagado en septiembre. Vence el 1 de octubre -> DEBE COMPROMETERSE
+            ExpenseCategory(
+                id = "prestamo",
+                name = "Préstamo",
+                limitAmount = 162.76,
+                isFixed = true,
+                isPaid = true,
+                payDay = 1,
+                isAdded = true
+            ),
+            // Recibo final de septiembre (135.45 €): payDay = 25. Pendiente de pago -> DEBE COMPROMETERSE
+            ExpenseCategory(
+                id = "recibo_sept",
+                name = "Luz Septiembre",
+                limitAmount = 135.45,
+                isFixed = true,
+                isPaid = false,
+                payDay = 25,
+                isAdded = true
+            ),
+            // Cofidis (100 €): payDay = 4. Ya pagado en septiembre. Vence el 4 de octubre -> DEBE COMPROMETERSE
+            ExpenseCategory(
+                id = "cofidis",
+                name = "Cofidis",
+                limitAmount = 100.0,
+                isFixed = true,
+                isPaid = true,
+                payDay = 4,
+                isAdded = true
+            ),
+            // Tarjeta (116.59 €): payDay = 5. Ya pagado en septiembre. Vence el 5 de octubre -> DEBE COMPROMETERSE
+            ExpenseCategory(
+                id = "tarjeta",
+                name = "Tarjeta",
+                limitAmount = 116.59,
+                isFixed = true,
+                isPaid = true,
+                payDay = 5,
+                isAdded = true
+            ),
+            // Recibo post-cobro (60 €): payDay = 12. Vence el 12 de octubre (tras cobrar el día 10) -> NO COMPROMETIDO EN ESTE CICLO
+            ExpenseCategory(
+                id = "internet_post",
+                name = "Internet Post Cobro",
+                limitAmount = 60.0,
+                isFixed = true,
+                isPaid = true,
+                payDay = 12,
+                isAdded = true
+            )
+        )
+        repository.saveCategories(categories)
+        advanceUntilIdle()
+
+        // Total gastos obligatorios comprometidos del ciclo = 380.0 + 162.76 + 135.45 + 100.0 + 116.59 = 894.80 €
+        // Con LocalDate solicitado por el usuario:
+        val pendingViaLocalDate = FinanceViewModel.getPendingExpensesForCycle(
+            categories,
+            incomeDay = 10,
+            currentDate = java.time.LocalDate.of(2026, 9, 16)
+        )
+        assertEquals(894.80, pendingViaLocalDate, 0.01)
+
+        // Saldo Libre Real = 884.0 - 894.80 = -10.80 € (déficit real detectado por el usuario)
+        val saldoLibre = viewModel.saldoRestanteDisponible.first { it < 0.0 }
+        assertEquals(-10.80, saldoLibre, 0.01)
+
+        viewModel.setReferenceCalendarForTesting(null)
     }
 }

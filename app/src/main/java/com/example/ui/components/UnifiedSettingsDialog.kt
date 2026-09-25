@@ -75,7 +75,7 @@ fun UnifiedSettingsDialog(
             tonalElevation = 6.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
+                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -114,7 +114,7 @@ fun UnifiedSettingsDialog(
                     }
                 }
 
-                // Scrollable Tabs
+                
                 ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = Color(0xFFF8FAFC),
@@ -159,7 +159,7 @@ fun UnifiedSettingsDialog(
                     )
                 }
 
-                // Tab Content Body
+                
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -235,7 +235,7 @@ private fun ProfileSettingsTab(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Section 1: Identidad y Foto de Usuario
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -253,7 +253,7 @@ private fun ProfileSettingsTab(
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                // Current Selected Avatar Preview
+                
                 Box(
                     contentAlignment = Alignment.BottomEnd
                 ) {
@@ -281,7 +281,7 @@ private fun ProfileSettingsTab(
                     }
                 }
 
-                // Text field for user name
+                
                 OutlinedTextField(
                     value = editUserName,
                     onValueChange = { editUserName = it },
@@ -294,7 +294,7 @@ private fun ProfileSettingsTab(
                         .testTag("edit_user_name_input")
                 )
 
-                // Avatar presets picker title
+                
                 Text(
                     text = "Selecciona un Avatar o una Foto de tu Galería:",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -302,7 +302,7 @@ private fun ProfileSettingsTab(
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                // Grid/Row of Preset Avatars + Gallery button
+                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -328,7 +328,7 @@ private fun ProfileSettingsTab(
                         }
                     }
 
-                    // Gallery photo selection button
+                    
                     Box(
                         modifier = Modifier
                             .size(42.dp)
@@ -352,7 +352,7 @@ private fun ProfileSettingsTab(
             }
         }
 
-        // Section 2: Income settings Card
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -452,7 +452,7 @@ private fun AppearanceSettingsTab(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Banners
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = cardBg),
             shape = RoundedCornerShape(16.dp),
@@ -492,7 +492,7 @@ private fun AppearanceSettingsTab(
             }
         }
 
-        // Color theme
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = cardBg),
             shape = RoundedCornerShape(16.dp),
@@ -545,7 +545,7 @@ private fun AppearanceSettingsTab(
             }
         }
 
-        // Icon Selector
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = cardBg),
             shape = RoundedCornerShape(16.dp),
@@ -598,7 +598,7 @@ private fun AppearanceSettingsTab(
             }
         }
 
-        // Currency Selector
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = cardBg),
             shape = RoundedCornerShape(16.dp),
@@ -716,7 +716,7 @@ private fun ServicesWizardSettingsTab(
                     color = FinanceSlateLight
                 )
 
-                // Mascotas
+                
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -744,7 +744,7 @@ private fun ServicesWizardSettingsTab(
 
                 HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-                // Hijos
+                
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -772,7 +772,7 @@ private fun ServicesWizardSettingsTab(
 
                 HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-                // Gastos Compartidos
+                
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -800,7 +800,7 @@ private fun ServicesWizardSettingsTab(
 
                 HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-                // Agua
+                
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -843,7 +843,7 @@ private fun ServicesWizardSettingsTab(
 
                 HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
-                // Luz
+                
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -964,7 +964,7 @@ private fun SecurityAndPerformanceTab(
                         color = FinanceSlateDark
                     )
 
-                    // Xiaomi
+                    
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFFF1F5F9),
@@ -976,7 +976,7 @@ private fun SecurityAndPerformanceTab(
                         }
                     }
 
-                    // Samsung
+                    
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFFF1F5F9),
@@ -988,7 +988,7 @@ private fun SecurityAndPerformanceTab(
                         }
                     }
 
-                    // Huawei / Honor
+                    
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFFF1F5F9),
@@ -1000,7 +1000,7 @@ private fun SecurityAndPerformanceTab(
                         }
                     }
 
-                    // Oppo / Realme / Vivo
+                    
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFFF1F5F9),
@@ -1030,7 +1030,7 @@ private fun SecurityAndPerformanceTab(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 🔒 1. Seguridad Biométrica
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -1083,7 +1083,7 @@ private fun SecurityAndPerformanceTab(
             }
         }
 
-        // 🔔 2. Alertas y Recordatorios de Pago
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -1140,7 +1140,7 @@ private fun SecurityAndPerformanceTab(
             }
         }
 
-        // 🏦 3. Detector de Notificaciones Bancarias (v2.1.0)
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -1188,7 +1188,7 @@ private fun SecurityAndPerformanceTab(
                                     try {
                                         context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                                     } catch (e: Exception) {
-                                        // fallback
+                                        
                                     }
                                 } else {
                                     com.example.service.BankNotificationListenerService.ensureServiceBound(context)
@@ -1211,7 +1211,7 @@ private fun SecurityAndPerformanceTab(
                 )
 
                 if (isBankInterceptorEnabled) {
-                    // Permission Status Badge
+                    
                     if (!isListenerPermissionGranted) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -1297,7 +1297,7 @@ private fun SecurityAndPerformanceTab(
                         }
                     }
 
-                    // Background & Battery Guide Section
+                    
                     if (isBatteryOptimizationIgnored) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -1403,7 +1403,7 @@ private fun SecurityAndPerformanceTab(
             }
         }
 
-        // 📅 3. Cierre de Ciclo Personalizado
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -1463,7 +1463,7 @@ private fun SecurityAndPerformanceTab(
             }
         }
 
-        // ⚡ 4. Modo de Alto Rendimiento
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
             shape = RoundedCornerShape(16.dp),
@@ -1501,7 +1501,7 @@ private fun SecurityAndPerformanceTab(
             }
         }
 
-        // 💾 5. Copia de Seguridad Manual (.fflow) y Automática (24h)
+        
         val backupSnackbarHostState = remember { SnackbarHostState() }
         Box(modifier = Modifier.fillMaxWidth()) {
             BackupAndRestoreSection(

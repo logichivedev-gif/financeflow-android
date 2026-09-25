@@ -92,7 +92,7 @@ fun WizardStep1Screen(
             ) {
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // App Brand Hero
+                
                 Box(
                     modifier = Modifier
                         .size(72.dp)
@@ -122,7 +122,7 @@ fun WizardStep1Screen(
                     textAlign = TextAlign.Center
                 )
 
-                // Input Card
+                
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -183,7 +183,7 @@ fun WizardStep1Screen(
                     }
                 }
 
-                // Continue Button
+                
                 Button(
                     onClick = { viewModel.completeStep1() },
                     modifier = Modifier
@@ -200,7 +200,7 @@ fun WizardStep1Screen(
                     )
                 }
 
-                // Restore Backup Option
+                
                 TextButton(
                     onClick = { restoreFileLauncher.launch("*/*") },
                     modifier = Modifier.testTag("wizard_restore_backup_btn")
@@ -564,7 +564,7 @@ fun WizardStep4Screen(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Suministros (Agua / Luz)
+                    
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -575,7 +575,7 @@ fun WizardStep4Screen(
                             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("Suministros del Hogar", fontWeight = FontWeight.Bold, color = FinanceSlateDark)
 
-                                // Agua
+                                
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -606,7 +606,7 @@ fun WizardStep4Screen(
 
                                 Divider(color = FinanceBorder.copy(alpha = 0.5f))
 
-                                // Luz
+                                
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -638,7 +638,7 @@ fun WizardStep4Screen(
                         }
                     }
 
-                    // Familia y Mascotas
+                    
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -649,7 +649,7 @@ fun WizardStep4Screen(
                             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("Mascotas e Hijos", fontWeight = FontWeight.Bold, color = FinanceSlateDark)
 
-                                // Mascotas
+                                
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -680,7 +680,7 @@ fun WizardStep4Screen(
 
                                 Divider(color = FinanceBorder.copy(alpha = 0.5f))
 
-                                // Hijos
+                                
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -712,7 +712,7 @@ fun WizardStep4Screen(
                         }
                     }
 
-                    // Suscripciones Populares
+                    
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),

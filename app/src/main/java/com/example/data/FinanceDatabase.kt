@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FinanceDao {
-    // Financial Profile
+    
     @Query("SELECT * FROM financial_profile WHERE id = 1")
     fun getFinancialProfileFlow(): Flow<FinancialProfile?>
 
@@ -25,7 +25,7 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFinancialProfile(profile: FinancialProfile)
 
-    // Expense Categories
+    
     @Query("SELECT * FROM expense_categories WHERE isAdded = 1 AND isArchived = 0")
     fun getActiveCategoriesFlow(): Flow<List<ExpenseCategory>>
 
@@ -56,7 +56,7 @@ interface FinanceDao {
     @Query("DELETE FROM expense_categories WHERE id = :id")
     suspend fun deleteCategoryById(id: String)
 
-    // Variable Daily Expenses
+    
     @Query("SELECT * FROM variable_expenses ORDER BY timestamp DESC")
     fun getVariableExpensesFlow(): Flow<List<VariableExpenseEntry>>
 
@@ -69,7 +69,7 @@ interface FinanceDao {
     @Query("DELETE FROM variable_expenses WHERE id = :id")
     suspend fun deleteVariableExpenseById(id: Int)
 
-    // Purge logic for situation resets
+    
     @Query("DELETE FROM financial_profile")
     suspend fun clearFinancialProfile()
 

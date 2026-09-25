@@ -50,7 +50,7 @@ fun UpdateDialog(
             dismissOnClickOutside = false
         ),
         shape = RoundedCornerShape(24.dp),
-        containerColor = Color(0xFF0F121A), // Fondo ultra oscuro coincidente con el Sidebar premium
+        containerColor = Color(0xFF0F121A), 
         icon = {
             Box(
                 modifier = Modifier

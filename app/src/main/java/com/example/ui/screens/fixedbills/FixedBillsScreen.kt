@@ -55,7 +55,7 @@ fun FixedBillsPane(
     var editingCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
     var viewingPlanCategory by remember { mutableStateOf<ExpenseCategory?>(null) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("TODOS") } // "TODOS", "PENDIENTES", "PAGADOS", "FINANCIACIONES"
+    var selectedFilter by remember { mutableStateOf("TODOS") } 
 
     val activeList = fixedExpenses.filter { !it.isArchived }
 
@@ -80,7 +80,7 @@ fun FixedBillsPane(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Summary Header Card
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -110,7 +110,7 @@ fun FixedBillsPane(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Botón de acceso a la Bandeja de Historial
+                        
                         IconButton(
                             onClick = { onNavigateToHistory() },
                             modifier = Modifier
@@ -127,7 +127,7 @@ fun FixedBillsPane(
                             )
                         }
 
-                        // Botón de Nuevo Gasto Fijo
+                        
                         Button(
                             onClick = { showAddDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = FinanceTeal),
@@ -176,7 +176,7 @@ fun FixedBillsPane(
             }
         }
 
-        // Search & Filter Row
+        
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -196,7 +196,7 @@ fun FixedBillsPane(
             )
         }
 
-        // Filter Chips
+        
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -221,7 +221,7 @@ fun FixedBillsPane(
             }
         }
 
-        // Bills List
+        
         if (filteredList.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -261,7 +261,7 @@ fun FixedBillsPane(
         }
     }
 
-    // Dialog: Add Fixed Bill
+    
     if (showAddDialog) {
         AddEditFixedBillDialog(
             category = null,
@@ -285,7 +285,7 @@ fun FixedBillsPane(
         )
     }
 
-    // Dialog: Edit Fixed Bill
+    
     editingCategory?.let { category ->
         AddEditFixedBillDialog(
             category = category,
@@ -310,7 +310,7 @@ fun FixedBillsPane(
         )
     }
 
-    // Dialog: Payment Plan
+    
     viewingPlanCategory?.let { category ->
         PaymentPlanDialog(
             category = category,
@@ -361,7 +361,7 @@ fun FixedBillCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Paid Checkbox
+                
                 Checkbox(
                     checked = category.isPaid,
                     onCheckedChange = { onTogglePaid() },
@@ -434,7 +434,7 @@ fun FixedBillCard(
                         }
                     }
 
-                    // Destacado de fecha de fin de la financiación
+                    
                     if (category.isFinancing) {
                         val endText = calculateFinancingEndDate(category)
                         if (endText.isNotBlank()) {
@@ -493,7 +493,7 @@ fun FixedBillCard(
                 }
             }
 
-            // Expanded Actions Area
+            
             AnimatedVisibility(visible = expandedOptions) {
                 Column(
                     modifier = Modifier
@@ -510,19 +510,19 @@ fun FixedBillCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            // Toggle Cash
+                            
                             FilterChip(
                                 selected = category.isCashPayment,
                                 onClick = { onToggleCash() },
                                 label = { Text("Efectivo", fontSize = 11.sp) }
                             )
-                            // Toggle Partner
+                            
                             FilterChip(
                                 selected = category.assumedByPartner,
                                 onClick = { onTogglePartner() },
                                 label = { Text("Asume Pareja", fontSize = 11.sp) }
                             )
-                            // Toggle Skip
+                            
                             FilterChip(
                                 selected = category.isSkippedThisMonth,
                                 onClick = { onToggleSkipped() },
@@ -706,7 +706,7 @@ fun AddEditFixedBillDialog(
                     modifier = Modifier.fillMaxWidth().testTag("dialog_fixed_name_input")
                 )
 
-                // Frequency / Periodicity Selector
+                
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Periodicidad del recibo",

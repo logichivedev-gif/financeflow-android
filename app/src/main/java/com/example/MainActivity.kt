@@ -80,7 +80,7 @@ class MainActivity : FragmentActivity() {
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    // Prompt remains visible for retry
+                    
                 }
             }
         )
@@ -106,7 +106,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Lock app when sent to background so next open/resume will re-authenticate
+        
         lifecycleScope.launch {
             val profile = repository.getProfileDirect()
             if (profile?.isBiometricEnabled == true) {
@@ -143,7 +143,7 @@ class MainActivity : FragmentActivity() {
             )
         )
 
-        // Schedule periodic notifications
+        
         try {
             val workRequest = PeriodicWorkRequestBuilder<ScheduleNotificationsWorker>(
                 1, TimeUnit.DAYS
@@ -157,18 +157,18 @@ class MainActivity : FragmentActivity() {
             e.printStackTrace()
         }
 
-        // Schedule daily automatic database backup (every 24h with battery constraint)
+        
         DailyBackupWorker.schedulePeriodicBackup(applicationContext)
 
 
-        // Request runtime permissions for notifications on Android 13+
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
             }
         }
 
-        // Observe database flows reactively to update widgets whenever profile, categories, or variable expenses change
+        
         lifecycleScope.launch {
             try {
                 combine(
@@ -184,7 +184,7 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            // Set up factory dynamically to bridge Room dependencies cleanly without heavy DI frameworks
+            
             val viewModel: FinanceViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
                 factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
@@ -204,10 +204,10 @@ class MainActivity : FragmentActivity() {
             val isBiometricEnabled = profile?.isBiometricEnabled == true
             val isAuthedState by isAuthenticated.collectAsStateWithLifecycle()
 
-            // App is unlocked if biometric lock is turned off OR user has authenticated
+            
             val isUnlocked = !isBiometricEnabled || isAuthedState
 
-            // Local state for system updates
+            
             val updateInfo = remember { mutableStateOf<UpdateInfo?>(null) }
 
             LaunchedEffect(isBiometricEnabled, isAuthedState) {
@@ -226,7 +226,7 @@ class MainActivity : FragmentActivity() {
                     e.printStackTrace()
                 }
 
-                // Check for incoming .fflow or backup file intent
+                
                 try {
                     val intentUri = intent?.data
                     if (intentUri != null) {
@@ -258,7 +258,7 @@ class MainActivity : FragmentActivity() {
                                 windowWidthSizeClass = windowSizeClass.widthSizeClass
                             )
 
-                            // Overlaid dialogue for independent package update
+                            
                             updateInfo.value?.let { info ->
                                 UpdateDialog(
                                     updateInfo = info,

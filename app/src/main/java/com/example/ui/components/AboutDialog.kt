@@ -69,7 +69,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
             Button(
                 onClick = {
                     try {
-                        uriHandler.openUri("https://ko-fi.com/logichivedev")
+                        uriHandler.openUri("https://github.com/logichivedev-gif/financeflow-android")
                     } catch (e: Exception) {}
                     onDismiss()
                 },
