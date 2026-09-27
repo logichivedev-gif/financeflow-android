@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,7 +40,7 @@ fun ArchivedCategoriesPane(
             .background(FinanceSoftBg)
             .padding(16.dp)
     ) {
-        
+        // Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -78,7 +79,7 @@ fun ArchivedCategoriesPane(
             }
         }
 
-        
+        // Info Banner
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,7 +107,7 @@ fun ArchivedCategoriesPane(
             }
         }
 
-        
+        // List
         if (archivedCategories.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -188,7 +189,9 @@ fun ArchivedCategoriesPane(
                                     Text(
                                         text = item.name,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = FinanceSlateDark
+                                        color = FinanceSlateDark,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),

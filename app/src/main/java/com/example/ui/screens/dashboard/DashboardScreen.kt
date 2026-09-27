@@ -1372,7 +1372,9 @@ private fun SubscriptionItemCard(
                 Text(
                     text = sub.name,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = FinanceSlateDark
+                    color = FinanceSlateDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (!isEditingPrice) {
                     Text(
@@ -2418,7 +2420,13 @@ fun DashboardStreamingToggle(
                     .clip(RoundedCornerShape(8.dp))
             )
             Spacer(modifier = Modifier.width(10.dp))
-            Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Switch(
                 checked = isActive,
                 onCheckedChange = onActiveChange,

@@ -34,6 +34,7 @@ sealed class Screen {
     object WizardStep3 : Screen()
     object WizardStep4 : Screen()
     object Dashboard : Screen()
+    object Graficas : Screen()
 }
 
 enum class DashboardTab {
@@ -245,6 +246,10 @@ class FinanceViewModel(
     // Current Screen Navigation Flow
     private val _currentScreen = MutableStateFlow<Screen>(Screen.WizardStep1)
     val currentScreen: StateFlow<Screen> = _currentScreen.asStateFlow()
+
+    fun navigateTo(screen: Screen) {
+        _currentScreen.value = screen
+    }
 
     private var isInitialScreenSet = false
     private var isRolloverChecked = false

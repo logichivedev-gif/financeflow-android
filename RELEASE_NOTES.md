@@ -1,4 +1,4 @@
-# 🚀 FinanceFlow - Notas de la Versión v2.2.0
+# 🚀 FinanceFlow - Notas de la Versión v2.3.0
 
 ¡Gran actualización acumulativa con mejoras clave en automatización, seguimiento financiero y diseño adaptativo!
 
@@ -74,4 +74,19 @@
 - **Anotación `@CriticalFinancialEngine`**: Anotación personalizada con `@RequiresOptIn(level = RequiresOptIn.Level.ERROR)` para bloquear cambios no intencionados o refactorizaciones accidentales en el motor de tesorería y liquidez tanto en IDE como en compilación.
 - **Caso de Uso de Dominio (`CalculateCycleBalanceUseCase`)**: Encapsulación completa de la lógica matemática del ciclo en la capa de dominio (`com.example.domain`), dejando a `FinanceViewModel` como simple consumidor que expone el estado reactivo hacia la UI sin mezclar fórmulas en los composables de Jetpack Compose.
 - **Pruebas unitarias de dominio dedicadas**: Validación exhaustiva en `CalculateCycleBalanceUseCaseTest` cubriendo cobros en días variables (ej. día 28), meses cortos (febrero con cobros a día 31 sin desbordes de fecha) y cálculo exacto de saldo libre real.
+
+---
+
+### 📊 12. Layouts Responsivos (Fix UI) y Pantalla Exclusiva de Gráficas (`FinancialGraphicsScreen`) [Hito 10/10]
+- **Corrección de Layouts Responsivos y Alta Densidad (DPI)**:
+  - Reemplazo de anchos fijos por layouts flexibles con `Modifier.weight(1f, fill = false)`, `wrapContentWidth()` y distribución con `FlowRow`.
+  - Eliminación total del colapso vertical en botones de acción rápida (`+ Nuevo` en Gastos Fijos y `+ Anotar Gasto` en Gastos Variables), garantizando `maxLines = 1` y `softWrap = false` para evitar apilamiento vertical de letras en pantallas estrechas o de alta densidad.
+  - Selector de antelación en Ajustes Globales adaptado con `FlowRow` y chips independientes, eliminando saltos de línea forzados y desbordes.
+  - Títulos de recibos, categorías fijas/variables y servicios de streaming blindados con `maxLines = 1` y `overflow = TextOverflow.Ellipsis`.
+- **Nueva Pantalla Exclusiva de Gráficas (`FinancialGraphicsScreen`)**:
+  - Pantalla totalmente independiente añadida a la navegación global y al NavHost (`Screen.Graficas`), accesible desde el menú lateral drawer y la barra superior de acciones sin recargar el Resumen ni el Análisis.
+  - **Gráfico de Dona / Anillo interactivo en Compose Canvas**: Componente nativo de alto rendimiento que dibuja mediante `drawArc` el desglose proporcional de **Gastos Fijos vs. Gastos Variables vs. Capacidad de Ahorro / Saldo Libre Real**, con animación fluida de entrada (`FastOutSlowInEasing`).
+  - **Consumo directo de la capa de Dominio**: Integración directa con `CalculateCycleBalanceUseCase` bajo la anotación `@CriticalFinancialEngine` para asegurar coherencia matemática absoluta con el ciclo de cobro de cada usuario.
+  - **Diseño Adaptativo M3**: Soporte responsive para smartphones y tablets (`WindowWidthSizeClass`), con desglose pormenorizado en tarjetas de métricas y tarjeta explicativa del ciclo de tesorería en tiempo real.
+
 

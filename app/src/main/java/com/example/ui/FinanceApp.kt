@@ -34,6 +34,7 @@ import com.example.ui.components.AboutDialog
 import com.example.ui.components.UnifiedSettingsDialog
 import com.example.ui.components.UserAvatarView
 import com.example.ui.screens.dashboard.DashboardScreen
+import com.example.ui.screens.graphics.FinancialGraphicsScreen
 import com.example.ui.screens.wizard.WizardStep1Screen
 import com.example.ui.screens.wizard.WizardStep2Screen
 import com.example.ui.screens.wizard.WizardStep3Screen
@@ -75,7 +76,7 @@ fun FinanceApp(
     var selectedSettingsTab by remember { mutableStateOf(0) }
     var showAboutDialog by remember { mutableStateOf(false) }
 
-    
+    // Sincronizar colores temáticos según la preferencia del perfil
     val activeThemeId = dbProfile?.selectedTheme ?: "azul"
     LaunchedEffect(activeThemeId) {
         when (activeThemeId) {
@@ -123,7 +124,7 @@ fun FinanceApp(
                 drawerContainerColor = Color(0xFF0F121A),
                 modifier = Modifier.width(310.dp)
             ) {
-                
+                // Cabecera de usuario
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -195,6 +196,18 @@ fun FinanceApp(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp).testTag(item.tag)
                     )
                 }
+
+                NavigationDrawerItem(
+                    label = { Text(stringResource(id = R.string.menu_graphics), fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.PieChart, contentDescription = null) },
+                    selected = currentScreen is Screen.Graficas,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        viewModel.navigateTo(Screen.Graficas)
+                    },
+                    colors = customDrawerItemColors,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp).testTag("drawer_menu_graficas")
+                )
 
                 NavigationDrawerItem(
                     label = { Text(stringResource(id = R.string.menu_about), fontWeight = FontWeight.Bold) },
@@ -311,15 +324,29 @@ fun FinanceApp(
                             }
                         }
 
-                        IconButton(
-                            onClick = { showAboutDialog = true },
-                            modifier = Modifier.testTag("about_app_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Acerca de la app",
-                                tint = FinanceSlateLight
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (currentScreen is Screen.Dashboard) {
+                                IconButton(
+                                    onClick = { viewModel.navigateTo(Screen.Graficas) },
+                                    modifier = Modifier.testTag("open_graficas_btn")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PieChart,
+                                        contentDescription = "Gráficas",
+                                        tint = FinanceTeal
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = { showAboutDialog = true },
+                                modifier = Modifier.testTag("about_app_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Acerca de la app",
+                                    tint = FinanceSlateLight
+                                )
+                            }
                         }
                     }
                 }
@@ -353,13 +380,18 @@ fun FinanceApp(
                                 activeDialog = SettingDialogType.BACKUP
                             }
                         )
+                        is Screen.Graficas -> FinancialGraphicsScreen(
+                            viewModel = viewModel,
+                            windowWidthSizeClass = windowWidthSizeClass,
+                            onBack = { viewModel.navigateTo(Screen.Dashboard) }
+                        )
                     }
                 }
             }
         }
     }
 
-    
+    // Diálogo Único de Ajustes Unificado (v1.6.0)
     if (activeDialog == SettingDialogType.SETTINGS ||
         activeDialog == SettingDialogType.PROFILE ||
         activeDialog == SettingDialogType.WIZARD_FIXED ||

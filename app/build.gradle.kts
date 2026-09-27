@@ -8,45 +8,45 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
-
-
-
+// -----------------------------------------------------------------------------
+// Auto-increment version logic using version.properties
+// -----------------------------------------------------------------------------
 val versionPropsFile = file("version.properties")
 val versionProps = Properties()
 
 if (versionPropsFile.canRead()) {
-    versionPropsFile.inputStream().use { versionProps.load(it) }
+  versionPropsFile.inputStream().use { versionProps.load(it) }
 } else {
-    versionProps.setProperty("VERSION_CODE", "14")
-    versionProps.setProperty("VERSION_MAJOR", "2")
-    versionProps.setProperty("VERSION_MINOR", "2")
-    versionProps.setProperty("VERSION_PATCH", "0")
-    versionProps.setProperty("CHANGES_COUNT", "0")
-    versionPropsFile.outputStream().use { versionProps.store(it, "Version Configuration") }
+  versionProps.setProperty("VERSION_CODE", "66")
+  versionProps.setProperty("VERSION_MAJOR", "2")
+  versionProps.setProperty("VERSION_MINOR", "3")
+  versionProps.setProperty("VERSION_PATCH", "0")
+  versionProps.setProperty("CHANGES_COUNT", "0")
+  versionPropsFile.outputStream().use { versionProps.store(it, "Version Configuration") }
 }
 
-var currentVersionCode = (versionProps.getProperty("VERSION_CODE") ?: "14").toIntOrNull() ?: 14
+var currentVersionCode = (versionProps.getProperty("VERSION_CODE") ?: "66").toIntOrNull() ?: 66
 val versionMajor = versionProps.getProperty("VERSION_MAJOR") ?: "2"
-val versionMinor = versionProps.getProperty("VERSION_MINOR") ?: "2"
+val versionMinor = versionProps.getProperty("VERSION_MINOR") ?: "3"
 val versionPatch = versionProps.getProperty("VERSION_PATCH") ?: "0"
 var changesCount = (versionProps.getProperty("CHANGES_COUNT") ?: "0").toIntOrNull() ?: 0
 
 val isBuildTask = gradle.startParameter.taskNames.any { taskName ->
-    taskName.contains("assemble", ignoreCase = true) ||
-    taskName.contains("bundle", ignoreCase = true) ||
-    taskName.contains("build", ignoreCase = true) ||
-    taskName.contains("compile", ignoreCase = true)
+  taskName.contains("assemble", ignoreCase = true) ||
+          taskName.contains("bundle", ignoreCase = true) ||
+          taskName.contains("build", ignoreCase = true) ||
+          taskName.contains("compile", ignoreCase = true)
 }
 
 if (isBuildTask) {
-    currentVersionCode += 1
-    versionProps.setProperty("VERSION_CODE", currentVersionCode.toString())
-    versionProps.setProperty("CHANGES_COUNT", changesCount.toString())
-    versionPropsFile.outputStream().use { versionProps.store(it, "Auto-incremented on build") }
+  currentVersionCode += 1
+  versionProps.setProperty("VERSION_CODE", currentVersionCode.toString())
+  versionProps.setProperty("CHANGES_COUNT", changesCount.toString())
+  versionPropsFile.outputStream().use { versionProps.store(it, "Auto-incremented on build") }
 }
 
 if (changesCount >= 10) {
-    logger.warn("""
+  logger.warn("""
     ********************************************************************************
     ⚠️  ALERTA DE LÍMITE DE VERSIÓN (REGLA DE LOS 10 CAMBIOS):
     Actualmente hay $changesCount / 10 cambios registrados en version.properties.
@@ -82,16 +82,14 @@ android {
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
-    create("debugConfig") {
-      val localKeystore = file("${rootDir}/debug.keystore")
-      storeFile = if (localKeystore.exists()) {
-          localKeystore
-      } else {
-          file(System.getProperty("user.home") + "/.android/debug.keystore")
+    getByName("debug") {
+      val customDebugKeystore = file("${rootDir}/debug.keystore")
+      if (customDebugKeystore.exists()) {
+        storeFile = customDebugKeystore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
       }
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
     }
   }
 
@@ -103,11 +101,7 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = if (file("${rootDir}/debug.keystore").exists()) {
-        signingConfigs.getByName("debugConfig")
-      } else {
-        signingConfigs.getByName("debug")
-      }
+      signingConfig = signingConfigs.getByName("debug")
     }
   }
   compileOptions {
@@ -121,24 +115,24 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
-
-
+// Configure the Secrets Gradle Plugin to use .env and .env.example files
+// to match the convention used in Web projects.
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
 }
 
-
-
+// Some unused dependencies are commented out below instead of being removed.
+// This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
-  
+  // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
-  
-  
-  
-  
+  // implementation(libs.androidx.camera.camera2)
+  // implementation(libs.androidx.camera.core)
+  // implementation(libs.androidx.camera.lifecycle)
+  // implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
@@ -147,23 +141,23 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  
+  // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  
+  // implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
-  
+  // implementation(libs.firebase.ai)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  
+  // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   implementation(libs.androidx.core.splashscreen)
   implementation(libs.androidx.biometric)

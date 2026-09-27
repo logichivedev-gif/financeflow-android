@@ -8,6 +8,9 @@
     <string name="menu_database">Gestión de Situación y Datos</string>
     <string name="menu_backup">Copia de Seguridad</string>
     <string name="menu_settings">Ajustes Globales</string>
+    <string name="menu_graphics">Gráficas</string>
+    <string name="graphics_title">Gráficas Financieras</string>
+    <string name="graphics_subtitle">Desglose visual del ciclo de tesorería</string>
 
     <!-- Vocabulario Neutro (Base / España) -->
     <string name="title_cycles">Ciclos de Pago</string>

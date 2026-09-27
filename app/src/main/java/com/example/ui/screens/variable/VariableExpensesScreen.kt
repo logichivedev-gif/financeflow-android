@@ -65,7 +65,7 @@ fun VariableSpentPane(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        
+        // Budget Overview Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -78,20 +78,30 @@ fun VariableSpentPane(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             text = "Presupuestos y Gastos Variables",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = FinanceSlateDark
+                            color = FinanceSlateDark,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${variableCategories.size} categorías activas",
                             style = MaterialTheme.typography.bodySmall,
-                            color = FinanceSlateLight
+                            color = FinanceSlateLight,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.wrapContentWidth()
+                    ) {
                         Button(
                             onClick = { showAddExpenseDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = FinanceTeal),
@@ -101,7 +111,7 @@ fun VariableSpentPane(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Anotar Gasto", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Anotar Gasto", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                         }
 
                         IconButton(
@@ -147,7 +157,7 @@ fun VariableSpentPane(
             }
         }
 
-        
+        // Categories with Progress
         Text(
             text = "Categorías de Gasto Cotidiano",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
@@ -173,90 +183,92 @@ fun VariableSpentPane(
                 }
             } else {
                 items(variableCategories, key = { it.id }) { cat ->
-                    val spentInCat = variableExpenses.filter { it.categoryName.equals(cat.name, ignoreCase = true) }.sumOf { it.amount }
-                    val progress = if (cat.limitAmount > 0) (spentInCat / cat.limitAmount).toFloat().coerceIn(0f, 1f) else 0f
-                    val isExceeded = cat.limitAmount > 0 && spentInCat > cat.limitAmount
+                val spentInCat = variableExpenses.filter { it.categoryName.equals(cat.name, ignoreCase = true) }.sumOf { it.amount }
+                val progress = if (cat.limitAmount > 0) (spentInCat / cat.limitAmount).toFloat().coerceIn(0f, 1f) else 0f
+                val isExceeded = cat.limitAmount > 0 && spentInCat > cat.limitAmount
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth().testTag("var_cat_card_${cat.id}"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, if (isExceeded) CardBorderRed.copy(alpha = 0.5f) else FinanceBorder)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(FinanceTeal.copy(alpha = 0.12f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.ShoppingBag, contentDescription = null, tint = FinanceTeal, modifier = Modifier.size(18.dp))
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = cat.name,
-                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = FinanceSlateDark
-                                        )
-                                        Text(
-                                            text = "${formatCurrency(spentInCat, currencySymbol)} de ${formatCurrency(cat.limitAmount, currencySymbol)}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (isExceeded) CardBorderRed else FinanceSlateLight
-                                        )
-                                    }
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("var_cat_card_${cat.id}"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, if (isExceeded) CardBorderRed.copy(alpha = 0.5f) else FinanceBorder)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(FinanceTeal.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.ShoppingBag, contentDescription = null, tint = FinanceTeal, modifier = Modifier.size(18.dp))
                                 }
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        onClick = {
-                                            selectedCategoryForQuickAdd = cat.name
-                                            showAddExpenseDialog = true
-                                        },
-                                        modifier = Modifier.size(32.dp).testTag("quick_add_cat_${cat.id}")
-                                    ) {
-                                        Icon(Icons.Default.AddCircleOutline, contentDescription = "Anotar aquí", tint = FinanceTeal, modifier = Modifier.size(20.dp))
-                                    }
-
-                                    IconButton(
-                                        onClick = { editingCategory = cat },
-                                        modifier = Modifier.size(32.dp).testTag("edit_cat_${cat.id}")
-                                    ) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = FinanceSlateLight, modifier = Modifier.size(18.dp))
-                                    }
-
-                                    IconButton(
-                                        onClick = { viewModel.deleteVariableBudgetDb(cat.id) },
-                                        modifier = Modifier.size(32.dp).testTag("delete_cat_${cat.id}")
-                                    ) {
-                                        Icon(Icons.Default.DeleteOutline, contentDescription = "Eliminar", tint = CardBorderRed, modifier = Modifier.size(18.dp))
-                                    }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = cat.name,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = FinanceSlateDark,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${formatCurrency(spentInCat, currencySymbol)} de ${formatCurrency(cat.limitAmount, currencySymbol)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isExceeded) CardBorderRed else FinanceSlateLight
+                                    )
                                 }
                             }
 
-                            
-                            LinearProgressIndicator(
-                                progress = { progress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = if (isExceeded) CardBorderRed else FinanceTeal,
-                                trackColor = Color(0xFFF1F5F9)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        selectedCategoryForQuickAdd = cat.name
+                                        showAddExpenseDialog = true
+                                    },
+                                    modifier = Modifier.size(32.dp).testTag("quick_add_cat_${cat.id}")
+                                ) {
+                                    Icon(Icons.Default.AddCircleOutline, contentDescription = "Anotar aquí", tint = FinanceTeal, modifier = Modifier.size(20.dp))
+                                }
+
+                                IconButton(
+                                    onClick = { editingCategory = cat },
+                                    modifier = Modifier.size(32.dp).testTag("edit_cat_${cat.id}")
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Editar", tint = FinanceSlateLight, modifier = Modifier.size(18.dp))
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.deleteVariableBudgetDb(cat.id) },
+                                    modifier = Modifier.size(32.dp).testTag("delete_cat_${cat.id}")
+                                ) {
+                                    Icon(Icons.Default.DeleteOutline, contentDescription = "Eliminar", tint = CardBorderRed, modifier = Modifier.size(18.dp))
+                                }
+                            }
                         }
+
+                        // Progress Bar
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = if (isExceeded) CardBorderRed else FinanceTeal,
+                            trackColor = Color(0xFFF1F5F9)
+                        )
                     }
                 }
             }
+            }
 
-            
+            // Recent Expenses Section
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column {
                     Spacer(modifier = Modifier.height(10.dp))
@@ -299,7 +311,9 @@ fun VariableSpentPane(
                                 Text(
                                     text = entry.categoryName,
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = FinanceSlateDark
+                                    color = FinanceSlateDark,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = dateStr,
@@ -327,7 +341,7 @@ fun VariableSpentPane(
         }
     }
 
-    
+    // Dialog: Record Expense
     if (showAddExpenseDialog) {
         AddExpenseEntryDialog(
             categories = variableCategories,
@@ -345,7 +359,7 @@ fun VariableSpentPane(
         )
     }
 
-    
+    // Dialog: Add Variable Category
     if (showAddCategoryDialog) {
         AddEditVariableCategoryDialog(
             category = null,
@@ -358,7 +372,7 @@ fun VariableSpentPane(
         )
     }
 
-    
+    // Dialog: Edit Variable Category
     editingCategory?.let { category ->
         AddEditVariableCategoryDialog(
             category = category,
